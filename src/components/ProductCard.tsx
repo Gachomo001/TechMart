@@ -56,12 +56,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
         <img
           src={image}
           alt={product.name}
-          className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-48 sm:h-56 md:h-64 object-cover group-hover:scale-105 transition-transform duration-300"
           onClick={handleViewDetails}
         />
         
         {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex flex-col gap-1 sm:gap-2">
           {product.is_bestseller && (
             <span className="bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
               Bestseller
@@ -75,26 +75,26 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
         </div>
 
         {/* Action buttons */}
-        <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute top-2 sm:top-3 right-2 sm:right-3 flex flex-col gap-1 sm:gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <button 
             onClick={handleWishlistToggle}
-            className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
+            className="bg-white/90 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg transition-colors"
           >
-            <Heart className={`w-4 h-4 ${isInWishlist(product.id) ? 'text-red-500 fill-current' : 'text-gray-600 hover:text-red-500'}`} />
+            <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${isInWishlist(product.id) ? 'text-red-500 fill-current' : 'text-gray-600 hover:text-red-500'}`} />
           </button>
           <button 
             onClick={handleViewDetails}
-            className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
+            className="bg-white/90 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg transition-colors"
           >
-            <Eye className="w-4 h-4 text-gray-600 hover:text-blue-500" />
+            <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-gray-600 hover:text-blue-500" />
           </button>
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Category and Stock Status */}
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-gray-500 capitalize">{subcategory}</p>
+          <p className="text-xs sm:text-sm text-gray-500 capitalize">{subcategory}</p>
           <span className={`${stockStatus.color} text-white px-2 py-1 rounded-full text-xs font-semibold`}>
             {stockStatus.text}
           </span>
@@ -102,7 +102,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
         
         {/* Product name */}
         <h3 
-          className="font-semibold text-gray-900 mb-2 truncate hover:text-blue-600 transition-colors cursor-pointer"
+          className="font-semibold text-gray-900 mb-2 truncate hover:text-blue-600 transition-colors cursor-pointer text-sm sm:text-base"
           onClick={handleViewDetails}
         >
           {product.name}
@@ -114,7 +114,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
-                className={`w-4 h-4 ${
+                className={`w-3 h-3 sm:w-4 sm:h-4 ${
                   i < Math.floor(product.rating)
                     ? 'text-yellow-400 fill-current'
                     : 'text-gray-300'
@@ -122,21 +122,21 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
               />
             ))}
           </div>
-          <span className="text-sm text-gray-600">
+          <span className="text-xs sm:text-sm text-gray-600">
             <span className="font-bold">{product.rating.toFixed(1)}</span> ({(product.review_count ?? 0).toLocaleString()})
           </span>
         </div>
 
         {/* Price */}
-        <div className="flex flex-col gap-1 mb-4 min-h-[3.5rem]">
+        <div className="flex flex-col gap-1 mb-4 min-h-[3rem] sm:min-h-[3.5rem]">
           {product.original_price ? (
-            <span className="text-lg text-gray-500 line-through">
+            <span className="text-sm sm:text-lg text-gray-500 line-through">
               KES {(product.original_price ?? 0).toLocaleString()}
             </span>
           ) : (
-            <div className="h-[1.5rem]"></div>
+            <div className="h-[1.25rem] sm:h-[1.5rem]"></div>
           )}
-          <span className="text-2xl font-bold text-gray-900">
+          <span className="text-xl sm:text-2xl font-bold text-gray-900">
             KES {(product.price ?? 0).toLocaleString()}
           </span>
         </div>
@@ -145,13 +145,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
         <button
           onClick={handleAddToCart}
           disabled={!inStock}
-          className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all ${
+          className={`w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg font-semibold transition-all text-sm sm:text-base ${
             inStock
               ? 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
-          <ShoppingCart className="w-4 h-4" />
+          <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
           {inStock ? 'Add to Cart' : 'Out of Stock'}
         </button>
       </div>

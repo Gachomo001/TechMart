@@ -38,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   // Fetch categories
@@ -61,6 +62,23 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
 
     fetchCategories();
   }, []);
+
+  // Calculate and set header height as CSS custom property
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        const headerHeight = headerRef.current.offsetHeight;
+        document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+      }
+    };
+
+    updateHeaderHeight();
+    window.addEventListener('resize', updateHeaderHeight);
+    
+    return () => {
+      window.removeEventListener('resize', updateHeaderHeight);
+    };
+  }, [categories, loading]); // Recalculate when categories load or layout changes
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -99,15 +117,16 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
 
   return (
     <>
-      <header className="bg-slate-900 text-white shadow-lg">
+      <header ref={headerRef} className="bg-slate-900 text-white shadow-lg" style={{ '--header-height': 'auto' } as React.CSSProperties}>
         {/* Top banner */}
-        <div className="bg-blue-600 py-2 px-6 sm:px-8 lg:px-12 text-center text-sm">
+        <div className="bg-blue-600 py-2 px-4 sm:px-6 lg:px-8 xl:px-12 text-center text-xs sm:text-sm">
           <p>+254 740 000 000 | info@techmart.com | 30-day return policy</p>
         </div>
 
         {/* Main header */}
-        <div className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-3 sm:py-4">
+          {/* Desktop Layout */}
+          <div className="hidden md:flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center space-x-4">
               <button 
@@ -118,11 +137,11 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
               </button>
             </div>
 
-            {/* Search bar */}
-            <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-8 hidden md:flex">
+            {/* Desktop Search bar */}
+            <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-8">
               <div className="flex w-full">
                 <select 
-                  className="bg-gray-100 text-gray-900 px-3 py-2 rounded-l-md border-r"
+                  className="bg-gray-100 text-gray-900 px-3 py-2 rounded-l-md border-r text-sm"
                   value={selectedCategoryId || ''}
                   onChange={(e) => setSelectedCategoryId(e.target.value || null)}
                 >
@@ -138,7 +157,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                   placeholder="Search for computers, accessories..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-4 py-2 text-gray-900 focus:outline-none"
+                  className="flex-1 px-4 py-2 text-gray-900 focus:outline-none text-sm"
                 />
                 <button
                   type="submit"
@@ -153,7 +172,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
             <div className="flex items-center space-x-10">
               <button 
                 onClick={toggleWishlist}
-                className="hidden md:flex flex-col items-center text-sm hover:text-blue-400 transition-colors relative"
+                className="flex flex-col items-center text-sm hover:text-blue-400 transition-colors relative"
               >
                 <div className="relative">
                   <Heart className={`w-7 h-7 ${wishlistState.items.length > 0 ? 'text-red-500 fill-current' : ''}`} />
@@ -163,12 +182,11 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                     </span>
                   )}
                 </div>
-                {/* <span>Wishlist</span> */}
               </button>
 
               <button
                 onClick={toggleCart}
-                className="hidden md:flex flex-col items-center text-sm hover:text-blue-400 transition-colors relative"
+                className="flex flex-col items-center text-sm hover:text-blue-400 transition-colors relative"
               >
                 <div className="relative">
                   <ShoppingCart className={`w-7 h-7 ${getTotalItems() > 0 ? 'text-yellow-500 fill-current' : ''}`} />
@@ -178,7 +196,6 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                     </span>
                   )}
                 </div>
-                {/* <span>Cart</span> */}
               </button>
               
               {user ? (
@@ -227,100 +244,179 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                   </div>
                 </div>
               ) : (
-                <Link to="/auth" className="hidden md:flex flex-col text-sm hover:text-blue-400 transition-colors ml-4">
+                <Link to="/auth" className="flex flex-col text-sm hover:text-blue-400 transition-colors ml-4">
                   <span className="text-gray-300">Hello, </span>
                   <span className="font-semibold">Sign in/ Register</span>
                 </Link>
               )}
-
-              <button className="md:hidden">
-                <Menu className="w-6 h-6" />
-              </button>
             </div>
           </div>
 
-          {/* Mobile search */}
-          <form onSubmit={handleSearch} className="md:hidden mt-4">
-            <div className="flex flex-col gap-2">
+          {/* Mobile Layout */}
+          <div className="md:hidden">
+            {/* First Row: Logo and Icons */}
+            <div className="flex items-center justify-between mb-3">
+              <button 
+                onClick={onLogoClick}
+                className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 hover:from-blue-500 hover:to-purple-500 transition-all"
+              >
+                TechMart
+              </button>
+              
+              <div className="flex items-center space-x-4">
+                <button 
+                  onClick={toggleWishlist}
+                  className="relative"
+                >
+                  <Heart className={`w-6 h-6 ${wishlistState.items.length > 0 ? 'text-red-500 fill-current' : 'text-white'}`} />
+                  {wishlistState.items.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {wishlistState.items.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={toggleCart}
+                  className="relative"
+                >
+                  <ShoppingCart className={`w-6 h-6 ${getTotalItems() > 0 ? 'text-yellow-500 fill-current' : 'text-white'}`} />
+                  {getTotalItems() > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {getTotalItems()}
+                    </span>
+                  )}
+                </button>
+                
+                {user ? (
+                  <div className="relative" ref={profileMenuRef}>
+                    <button
+                      onClick={() => setShowProfileMenu(!showProfileMenu)}
+                      className="flex items-center"
+                    >
+                      <User className="w-6 h-6 text-white" />
+                    </button>
+
+                    {showProfileMenu && (
+                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg py-2 z-50">
+                        <Link
+                          to="/profile"
+                          className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
+                          onClick={() => setShowProfileMenu(false)}
+                        >
+                          <Settings className="w-4 h-4" />
+                          <span>Edit Profile</span>
+                        </Link>
+                        {isAdmin && (
+                          <Link
+                            to="/admin"
+                            className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
+                            onClick={() => setShowProfileMenu(false)}
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => {
+                            handleSignOut();
+                            setShowProfileMenu(false);
+                          }}
+                          className="flex items-center space-x-2 w-full px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link to="/auth" className="flex items-center">
+                    <User className="w-6 h-6 text-white" />
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Second Row: Search Bar with Category Selector */}
+            <form onSubmit={handleSearch} className="flex w-full">
               <select 
-                className="w-full bg-gray-100 text-gray-900 px-3 py-2 rounded-md"
+                className="w-[30%] bg-gray-100 text-gray-900 px-2 py-2 rounded-l-md border-r text-xs"
                 value={selectedCategoryId || ''}
                 onChange={(e) => setSelectedCategoryId(e.target.value || null)}
               >
-                <option value="">All Categories</option>
+                <option value="">All</option>
                 {categories.map(category => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
                 ))}
               </select>
-              <div className="flex">
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-4 py-2 text-gray-900 rounded-l-md focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  className="bg-orange-500 hover:bg-orange-600 px-4 py-2 rounded-r-md transition-colors"
-                >
-                  <Search className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </form>
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 px-3 py-2 text-gray-900 focus:outline-none text-sm"
+              />
+              <button
+                type="submit"
+                className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-r-md transition-colors"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Navigation */}
         <nav className="bg-slate-800 border-t border-slate-700">
-          <div className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12">
-            <div className="flex items-center justify-between py-3">
-              <div className="flex items-center space-x-8">
-                <button
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
+            <div className="flex items-center justify-between py-2 sm:py-3">
+              <div className="flex items-center space-x-4 sm:space-x-8">
+                <div
                   onMouseEnter={() => setShowCategories(true)}
                   onMouseLeave={() => setShowCategories(false)}
-                  className="flex items-center space-x-1 hover:text-blue-400 transition-colors relative"
+                  className="flex items-center space-x-1 hover:text-blue-400 transition-colors relative text-sm sm:text-base cursor-pointer"
                 >
-                  <Menu className="w-4 h-4" />
+                  <Menu className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>All Categories</span>
                   
                   {showCategories && (
-                    <div className="absolute top-full left-0 bg-white text-gray-900 shadow-lg border rounded-md w-64 z-50">
+                    <div className="absolute top-full left-0 bg-white text-gray-900 shadow-lg border rounded-md w-56 sm:w-64 z-50">
                       {loading ? (
-                        <div className="p-4 text-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                        <div className="p-3 sm:p-4 text-center">
+                          <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-blue-600 mx-auto"></div>
                         </div>
                       ) : (
                         categories.map(category => (
-                          <button
+                          <div
                             key={category.id}
                             onClick={() => handleCategoryClick(category.slug)}
-                            className="block w-full text-left px-4 py-3 hover:bg-gray-100 transition-colors border-b last:border-b-0"
+                            className="block w-full text-left px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-100 transition-colors border-b last:border-b-0 text-sm sm:text-base cursor-pointer"
                           >
                             <div className="font-semibold">{category.name}</div>
                             {category.description && (
-                              <div className="text-sm text-gray-600">
+                              <div className="text-xs sm:text-sm text-gray-600">
                                 {category.description}
                               </div>
                             )}
-                          </button>
+                          </div>
                         ))
                       )}
                     </div>
                   )}
-                </button>
+                </div>
                 
-                <div className="hidden md:flex space-x-8">
+                <div className="hidden md:flex space-x-6 sm:space-x-8">
                   {loading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-blue-400"></div>
                   ) : (
                     categories.slice(0, 6).map(category => (
                       <button 
                         key={category.id}
                         onClick={() => handleCategoryClick(category.slug)}
-                        className="hover:text-blue-400 transition-colors"
+                        className="hover:text-blue-400 transition-colors text-sm sm:text-base"
                       >
                         {category.name}
                       </button>
@@ -329,19 +425,30 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                 </div>
               </div>
               
-              <div className="hidden md:flex space-x-8">
-                <span 
+              <div className="flex items-center space-x-4 sm:space-x-6">
+                {/* Mobile Today's Deals Button */}
+                <button 
                   onClick={onViewDealsClick}
-                  className="text-orange-400 font-semibold cursor-pointer hover:text-orange-300 transition-colors"
+                  className="md:hidden text-orange-400 font-semibold cursor-pointer hover:text-orange-300 transition-colors text-sm sm:text-base"
                 >
                   Today's Deals
-                </span>
-                <span 
-                  onClick={() => setShowCustomerService(true)}
-                  className="text-green-400 cursor-pointer hover:text-green-300 transition-colors"
-                >
-                  Customer Service
-                </span>
+                </button>
+                
+                {/* Desktop Navigation */}
+                <div className="hidden md:flex space-x-6 sm:space-x-8">
+                  <span 
+                    onClick={onViewDealsClick}
+                    className="text-orange-400 font-semibold cursor-pointer hover:text-orange-300 transition-colors text-sm sm:text-base"
+                  >
+                    Today's Deals
+                  </span>
+                  <span 
+                    onClick={() => setShowCustomerService(true)}
+                    className="text-green-400 cursor-pointer hover:text-green-300 transition-colors text-sm sm:text-base"
+                  >
+                    Customer Service
+                  </span>
+                </div>
               </div>
             </div>
           </div>

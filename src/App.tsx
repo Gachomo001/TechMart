@@ -15,6 +15,7 @@ import PaymentTest from './components/PaymentTest';
 import Footer from './components/Footer';
 import Auth from './components/Auth';
 import AllProducts from './pages/AllProducts';
+import DealsPage from './pages/DealsPage';
 import RoleGuard from './components/RoleGuard';
 import AdminLayout from './components/admin/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
@@ -204,19 +205,7 @@ function App() {
   };
 
   const handleViewDealsClick = () => {
-    if (featuredProductsRef.current) {
-      // Add a small delay to ensure the ref is available
-      setTimeout(() => {
-        const headerOffset = 128; // Height of the fixed header
-        const elementPosition = featuredProductsRef.current?.getBoundingClientRect().top ?? 0;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-      }, 100);
-    }
+    navigate('/deals');
   };
 
   const handleSignInRequired = () => {
@@ -232,6 +221,7 @@ function App() {
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/all-products" element={<AllProducts onSignInRequired={handleSignInRequired} />} />
+              <Route path="/deals" element={<DealsPage onSignInRequired={handleSignInRequired} />} />
               <Route path="/category/:categorySlug" element={<CategoryPage onSignInRequired={handleSignInRequired} />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/payment/callback" element={<PaymentCallback />} />
@@ -246,7 +236,7 @@ function App() {
                     />
                   </div>
                   
-                  <div className="pt-32">
+                  <div className="pt-0" style={{ paddingTop: 'var(--header-height, 0px)' }}>
                     {!searchQuery && !selectedCategory && (
                       <>
                         <HeroSection 
@@ -257,10 +247,10 @@ function App() {
                       </>
                     )}
                     
-                    <div ref={featuredProductsRef} className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12">
+                    <div ref={featuredProductsRef} className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
                       {loadingProducts ? (
-                        <div className="flex justify-center items-center py-12">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                        <div className="flex justify-center items-center py-8 sm:py-12">
+                          <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600"></div>
                         </div>
                       ) : (
                         <ProductGrid products={filteredProducts} title={getPageTitle()} onSignInRequired={handleSignInRequired} />
@@ -268,12 +258,14 @@ function App() {
                     </div>
                   </div>
                   
-                  <Footer />
+                  <div className="mt-16 sm:mt-20 md:mt-24 lg:mt-32">
+                    <Footer />
+                  </div>
                   <Cart />
                   <Wishlist />
                   {showAuthModal && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                      <div className="bg-white rounded-2xl max-w-md w-full p-6">
+                      <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6">
                         <Auth />
                         <button
                           onClick={() => setShowAuthModal(false)}

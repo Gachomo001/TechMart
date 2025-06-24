@@ -322,7 +322,7 @@ const CategoryPage: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInReq
         <Header 
           onSearch={setSearchQuery}
           onLogoClick={() => navigate('/')}
-          onViewDealsClick={() => {}}
+          onViewDealsClick={() => navigate('/deals')}
         />
         <div className="flex justify-center items-center min-h-screen pt-32">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -341,7 +341,7 @@ const CategoryPage: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInReq
         <Header 
           onSearch={setSearchQuery}
           onLogoClick={() => navigate('/')}
-          onViewDealsClick={() => {}}
+          onViewDealsClick={() => navigate('/deals')}
         />
       </div>
 

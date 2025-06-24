@@ -171,18 +171,18 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
   return (
     <div className="container mx-auto px-4 py-4" style={{ paddingTop: '60px' }}>
       {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">{title}</h2>
-          <p className="text-gray-600 mt-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h2>
+          <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
             Showing {filteredAndSortedProducts.length} of {products.length} products
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors lg:hidden"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors lg:hidden text-sm sm:text-base"
           >
             <Filter className="w-4 h-4" />
             Filters
@@ -196,7 +196,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
           >
             <option value="featured">Featured</option>
             <option value="newest">Newest</option>
@@ -208,18 +208,18 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
         </div>
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
         {/* Filters Sidebar */}
-        <div className={`w-64 flex-shrink-0 ${showFilters ? 'block' : 'hidden lg:block'}`}>
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-200">Filters</h2>
+        <div className={`w-full lg:w-64 flex-shrink-0 ${showFilters ? 'block' : 'hidden lg:block'}`}>
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-gray-200">Filters</h2>
 
             {/* Price Range Filter */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Range</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Price Range</h3>
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-2">
+                  <div className="flex-1 w-full sm:w-auto">
                     <label htmlFor="minPrice" className="block text-sm text-gray-600 mb-1">Min Price (KES)</label>
                     <input
                       type="number"
@@ -228,10 +228,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
                       onChange={(e) => handlePriceChange('min', e.target.value)}
                       placeholder="0"
                       min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                     />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 w-full sm:w-auto">
                     <label htmlFor="maxPrice" className="block text-sm text-gray-600 mb-1">Max Price (KES)</label>
                 <input
                       type="number"
@@ -240,7 +240,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
                       onChange={(e) => handlePriceChange('max', e.target.value)}
                       placeholder={maxPrice}
                   min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                     />
                   </div>
                 </div>
@@ -248,14 +248,14 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
             </div>
 
             {/* Categories Filter */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Categories</h3>
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Categories</h3>
               {isLoading ? (
                 <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-blue-600"></div>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto pr-2">
                   {categories.map(category => (
                     <label key={category.id} className="flex items-center space-x-2">
                       <input
@@ -272,14 +272,14 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
             </div>
 
             {/* Subcategories Filter */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Subcategories</h3>
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Subcategories</h3>
               {isLoading ? (
                 <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-blue-600"></div>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto pr-2">
                 {subcategories.map(subcategory => (
                     <label key={subcategory.id} className="flex items-center space-x-2">
                     <input
@@ -296,8 +296,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
             </div>
 
             {/* Others Filter */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Others</h3>
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Others</h3>
               <div className="space-y-2">
                 <label className="flex items-center space-x-2">
                   <input
@@ -314,7 +314,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-sm text-sm sm:text-base"
               >
                 Clear All Filters
               </button>
@@ -325,21 +325,21 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, title = "All Produc
         {/* Products Grid */}
         <div className="flex-1">
           {filteredAndSortedProducts.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-gray-400 text-6xl mb-4">🔍</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
-              <p className="text-gray-600 mb-4">Try adjusting your filters or search terms</p>
+            <div className="text-center py-8 sm:py-12">
+              <div className="text-gray-400 text-4xl sm:text-6xl mb-3 sm:mb-4">🔍</div>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No products found</h3>
+              <p className="text-gray-600 mb-4 text-sm sm:text-base">Try adjusting your filters or search terms</p>
               {hasActiveFilters && (
                 <button
                   onClick={clearAllFilters}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 >
                   Clear All Filters
                 </button>
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredAndSortedProducts.map(product => (
                 <ProductCard
                   key={product.id}

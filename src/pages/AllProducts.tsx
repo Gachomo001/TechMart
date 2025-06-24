@@ -369,7 +369,7 @@ const AllProducts: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInRequ
           onSearch={setSearchQuery}
           onCategorySelect={(category) => setSelectedCategories([category])}
           onLogoClick={() => window.location.href = '/'}
-          onViewDealsClick={() => window.location.href = '/all-products'}
+          onViewDealsClick={() => window.location.href = '/deals'}
         />
       </div>
       {loadingProducts ? (

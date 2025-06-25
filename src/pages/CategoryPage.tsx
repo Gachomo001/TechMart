@@ -347,9 +347,9 @@ const CategoryPage: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInReq
 
       <div className="pt-48">
         <div className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="flex gap-8">
+          <div className="flex flex-col lg:flex-row gap-8">
             {/* Filters Sidebar */}
-            <div className={`w-64 flex-shrink-0 ${showFilters ? 'block' : 'hidden lg:block'}`}>
+            <div className={`w-full lg:w-64 flex-shrink-0 ${showFilters ? 'block' : 'hidden lg:block'}`}>
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6 pb-4 border-b border-gray-200">Filters</h2>
                 

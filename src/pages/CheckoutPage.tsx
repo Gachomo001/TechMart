@@ -1008,7 +1008,7 @@ const CheckoutPage: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="absolute top-6 right-6">
+        <div className="absolute top-6 right-6 hidden md:block">
           <BackButton text="Back to Store" onClick={handleBackToStore} />
         </div>
       </div>

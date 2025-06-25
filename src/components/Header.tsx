@@ -23,7 +23,7 @@ interface HeaderProps {
   onCategorySelect?: (category: string) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick, onCategorySelect }) => {
+const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick }) => {
   const navigate = useNavigate();
   const { getTotalItems, toggleCart } = useCart();
   const { state: wishlistState, toggleWishlist } = useWishlist();
@@ -38,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileProfileMenuRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
@@ -83,13 +84,27 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
   // Close profile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      const isOutsideDesktop = !profileMenuRef.current?.contains(event.target as Node);
+      const isOutsideMobile = !mobileProfileMenuRef.current?.contains(event.target as Node);
+      
+      if (isOutsideDesktop && isOutsideMobile) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         setShowProfileMenu(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -210,7 +225,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                     </button>
 
                     {showProfileMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-[9999] border border-gray-200">
                         <Link
                           to="/profile"
                           className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
@@ -289,7 +304,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                 </button>
                 
                 {user ? (
-                  <div className="relative" ref={profileMenuRef}>
+                  <div className="relative" ref={mobileProfileMenuRef}>
                     <button
                       onClick={() => setShowProfileMenu(!showProfileMenu)}
                       className="flex items-center"
@@ -298,7 +313,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                     </button>
 
                     {showProfileMenu && (
-                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg py-2 z-50">
+                      <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg py-2 z-[9999] border border-gray-200">
                         <Link
                           to="/profile"
                           className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors text-sm"
@@ -352,21 +367,21 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                   </option>
                 ))}
               </select>
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 px-3 py-2 text-gray-900 focus:outline-none text-sm"
-              />
-              <button
-                type="submit"
+                />
+                <button
+                  type="submit"
                 className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-r-md transition-colors"
-              >
+                >
                 <Search className="w-4 h-4" />
-              </button>
+                </button>
             </form>
-          </div>
+            </div>
         </div>
 
         {/* Navigation */}
@@ -439,15 +454,15 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                   <span 
                     onClick={onViewDealsClick}
                     className="text-orange-400 font-semibold cursor-pointer hover:text-orange-300 transition-colors text-sm sm:text-base"
-                  >
-                    Today's Deals
-                  </span>
-                  <span 
-                    onClick={() => setShowCustomerService(true)}
+                >
+                  Today's Deals
+                </span>
+                <span 
+                  onClick={() => setShowCustomerService(true)}
                     className="text-green-400 cursor-pointer hover:text-green-300 transition-colors text-sm sm:text-base"
-                  >
-                    Customer Service
-                  </span>
+                >
+                  Customer Service
+                </span>
                 </div>
               </div>
             </div>

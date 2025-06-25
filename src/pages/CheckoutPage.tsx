@@ -106,6 +106,11 @@ const CheckoutPage: React.FC = () => {
   const [regions, setRegions] = useState<{ value: string; label: string }[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
 
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   // Add after other useState declarations
   const [selectedRegionDetails, setSelectedRegionDetails] = useState<{
     delivery_status: 'paid' | 'free' | null;
@@ -296,6 +301,8 @@ const CheckoutPage: React.FC = () => {
   const handleShippingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentStep(2);
+    // Scroll to top of the page when proceeding to payment
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
@@ -1160,52 +1167,42 @@ const CheckoutPage: React.FC = () => {
                 {/* Payment Method Selection */}
                 <div className="mb-8">
                   <h3 className="text-lg font-semibold mb-4">Choose Payment Method</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                  <div className="grid grid-cols-2 gap-4 mb-8">
                     {/* M-Pesa Option */}
-                    <label className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors overflow-hidden ${
-                      paymentMethod === 'mpesa' 
-                        ? 'border-green-500' 
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}>
+                    <div 
+                      className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors overflow-hidden ${
+                        paymentMethod === 'mpesa' 
+                          ? 'border-green-500' 
+                          : 'border-slate-700 hover:border-slate-600'
+                      }`}
+                      onClick={() => setPaymentMethod('mpesa')}
+                    >
                       <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-blue-600/20" />
                       <div className="relative z-10 flex items-center w-full">
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="mpesa"
-                          checked={paymentMethod === 'mpesa'}
-                          onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'mpesa')}
-                          className="text-green-600"
-                        />
-                        <div className="ml-3 flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                           <Smartphone className="w-5 h-5" />
-                          <span className="font-medium">M-Pesa</span>
+                          <span className="font-medium text-sm md:text-base">M-Pesa</span>
                         </div>
                       </div>
-                    </label>
+                    </div>
 
                     {/* Credit/Debit Card Option */}
-                    <label className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors overflow-hidden ${
-                      paymentMethod === 'card' 
-                        ? 'border-blue-500' 
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}>
+                    <div 
+                      className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors overflow-hidden ${
+                        paymentMethod === 'card' 
+                          ? 'border-blue-500' 
+                          : 'border-slate-700 hover:border-slate-600'
+                      }`}
+                      onClick={() => setPaymentMethod('card')}
+                    >
                       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
                       <div className="relative z-10 flex items-center w-full">
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value="card"
-                          checked={paymentMethod === 'card'}
-                          onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'mpesa')}
-                          className="text-blue-600"
-                        />
-                        <div className="ml-3 flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                           <CreditCard className="w-5 h-5" />
-                          <span className="font-medium">Credit/Debit Card</span>
+                          <span className="font-medium text-sm md:text-base">Card</span>
                         </div>
                       </div>
-                    </label>
+                    </div>
                   </div>
                 </div>
 
@@ -1397,7 +1394,7 @@ const CheckoutPage: React.FC = () => {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 sticky top-4">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 sticky top-4 z-0">
               <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
               
               <div className="space-y-4 mb-6">

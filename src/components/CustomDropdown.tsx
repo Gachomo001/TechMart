@@ -103,6 +103,7 @@ const StyledWrapper = styled.div`
     background-color: rgb(51 65 85 / 0.5);
     border: 1px solid rgb(71 85 105);
     border-radius: 0.5rem;
+    z-index: 50;
   }
 
   // .select.required {
@@ -116,6 +117,7 @@ const StyledWrapper = styled.div`
 
   .select.open {
     border-color: rgb(59 130 246);
+    z-index: 99999;
   }
 
   .loading-wrapper {
@@ -178,7 +180,7 @@ const StyledWrapper = styled.div`
     visibility: hidden;
     transition: all 200ms ease;
     transform: translateY(-10px);
-    z-index: 1000;
+    z-index: 99999;
     border: 1px solid rgb(71 85 105);
     margin-top: 0.25rem;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);

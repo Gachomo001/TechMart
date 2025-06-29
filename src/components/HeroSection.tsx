@@ -138,28 +138,28 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onShopNowClick, onViewDealsCl
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center py-6 sm:py-8 lg:py-12 w-full">
           {/* Hero Content - Order 1 on mobile, 1 on desktop */}
           <div className="space-y-6 sm:space-y-8 relative z-20 order-1 lg:order-1">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight text-center sm:text-left">
               Welcome to
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
                 {' '}TechMart
               </span>
             </h1>
             
-            <p className="text-2xl sm:text-xl lg:text-2xl text-blue-100 leading-relaxed max-w-2xl">
+            <p className="text-2xl sm:text-xl lg:text-2xl text-blue-100 leading-relaxed max-w-2xl text-center sm:text-left">
             Power your digital life with cutting-edge tech. Discover premium laptops, gaming rigs, and more—backed by competitive pricing and expert support.
             </p>
             
-            <div className="flex flex-row gap-3 sm:gap-4 relative z-30">
+            <div className="flex flex-row gap-3 sm:gap-4 relative z-30 justify-center sm:justify-start">
               <button 
                 onClick={onShopNowClick}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all transform hover:scale-105 shadow-lg relative z-40"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 sm:px-8 sm:py-4 rounded-lg font-semibold text-lg sm:text-lg transition-all transform hover:scale-105 shadow-lg relative z-40"
               >
                 <span className="sm:hidden">Shop</span>
                 <span className="hidden sm:inline">Shop All Products</span>
               </button>
               <button 
                 onClick={onViewDealsClick}
-                className="border-2 border-white text-white hover:bg-white hover:text-blue-900 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all relative z-40"
+                className="border-2 border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4 sm:px-8 sm:py-4 rounded-lg font-semibold text-lg sm:text-lg transition-all relative z-40"
               >
                 <span className="sm:hidden">Deals</span>
                 <span className="hidden sm:inline">View Deals</span>

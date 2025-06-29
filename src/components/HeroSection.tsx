@@ -137,7 +137,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onShopNowClick, onViewDealsCl
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 h-full flex items-center relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center py-6 sm:py-8 lg:py-12 w-full">
           {/* Hero Content - Order 1 on mobile, 1 on desktop */}
-          <div className="space-y-6 sm:space-y-8 relative z-20 order-1 lg:order-1">
+          <div className="space-y-8 sm:space-y-8 relative z-20 order-1 lg:order-1">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight text-center sm:text-left">
               Welcome to
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">

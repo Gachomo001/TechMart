@@ -112,6 +112,12 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
     onSearch(searchQuery, selectedCategoryId);
   };
 
+  const handleMobileSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Mobile always searches all products (no category filter)
+    onSearch(searchQuery, null);
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -135,7 +141,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
       <header ref={headerRef} className="bg-slate-900 text-white shadow-lg" style={{ '--header-height': 'auto' } as React.CSSProperties}>
         {/* Top banner */}
         <div className="bg-blue-600 py-2 px-4 sm:px-6 lg:px-8 xl:px-12 text-center text-xs sm:text-sm">
-          <p>+254 740 000 000 | info@techmart.com | 30-day return policy</p>
+          <p>+254 740 000 000 | info@techmart.com</p>
         </div>
 
         {/* Main header */}
@@ -354,49 +360,37 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
             </div>
 
             {/* Second Row: Search Bar with Category Selector */}
-            <form onSubmit={handleSearch} className="flex w-full">
-              <select 
-                className="w-[30%] bg-gray-100 text-gray-900 px-2 py-2 rounded-l-md border-r text-xs"
-                value={selectedCategoryId || ''}
-                onChange={(e) => setSelectedCategoryId(e.target.value || null)}
-              >
-                <option value="">All</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 px-3 py-2 text-gray-900 focus:outline-none text-sm"
-                />
-                <button
-                  type="submit"
+            <form onSubmit={handleMobileSearch} className="flex w-full">
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 px-3 py-2 text-gray-900 focus:outline-none text-sm rounded-l-md"
+              />
+              <button
+                type="submit"
                 className="bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-r-md transition-colors"
-                >
+              >
                 <Search className="w-4 h-4" />
-                </button>
+              </button>
             </form>
             </div>
         </div>
 
         {/* Navigation */}
-        <nav className="bg-slate-800 border-t border-slate-700">
+        <nav className="hidden md:block bg-slate-800 border-t border-slate-700">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
             <div className="flex items-center justify-between py-2 sm:py-3">
               <div className="flex items-center space-x-4 sm:space-x-8">
+                {/* All Categories - Only show on desktop */}
                 <div
                   onMouseEnter={() => setShowCategories(true)}
                   onMouseLeave={() => setShowCategories(false)}
-                  className="flex items-center space-x-1 hover:text-blue-400 transition-colors relative text-sm sm:text-base cursor-pointer"
+                  className="hidden md:flex items-center space-x-1 hover:text-blue-400 transition-colors relative text-sm sm:text-base cursor-pointer"
                 >
                   <Menu className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>All Categories</span>
-                  
                   {showCategories && (
                     <div className="absolute top-full left-0 bg-white text-gray-900 shadow-lg border rounded-md w-56 sm:w-64 z-50">
                       {loading ? (
@@ -422,7 +416,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                     </div>
                   )}
                 </div>
-                
+                {/* Desktop category quick links */}
                 <div className="hidden md:flex space-x-6 sm:space-x-8">
                   {loading ? (
                     <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-blue-400"></div>
@@ -439,30 +433,21 @@ const Header: React.FC<HeaderProps> = ({ onSearch, onLogoClick, onViewDealsClick
                   )}
                 </div>
               </div>
-              
               <div className="flex items-center space-x-4 sm:space-x-6">
-                {/* Mobile Today's Deals Button */}
-                <button 
-                  onClick={onViewDealsClick}
-                  className="md:hidden text-orange-400 font-semibold cursor-pointer hover:text-orange-300 transition-colors text-sm sm:text-base"
-                >
-                  Today's Deals
-                </button>
-                
-                {/* Desktop Navigation */}
+                {/* Today's Deals - Only show on desktop */}
                 <div className="hidden md:flex space-x-6 sm:space-x-8">
                   <span 
                     onClick={onViewDealsClick}
                     className="text-orange-400 font-semibold cursor-pointer hover:text-orange-300 transition-colors text-sm sm:text-base"
-                >
-                  Today's Deals
-                </span>
-                <span 
-                  onClick={() => setShowCustomerService(true)}
+                  >
+                    Today's Deals
+                  </span>
+                  <span 
+                    onClick={() => setShowCustomerService(true)}
                     className="text-green-400 cursor-pointer hover:text-green-300 transition-colors text-sm sm:text-base"
-                >
-                  Customer Service
-                </span>
+                  >
+                    Customer Service
+                  </span>
                 </div>
               </div>
             </div>

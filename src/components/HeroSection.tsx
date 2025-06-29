@@ -145,7 +145,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onShopNowClick, onViewDealsCl
               </span>
             </h1>
             
-            <p className="text-2xl sm:text-xl lg:text-2xl text-blue-100 leading-relaxed max-w-2xl text-center sm:text-left">
+            <p className="text-2xl sm:text-xl lg:text-2xl text-blue-100 leading-relaxed max-w-2xl text-center sm:text-left font-serif sm:font-sans">
             Power your digital life with cutting-edge tech. Discover premium laptops, gaming rigs, and more—backed by competitive pricing and expert support.
             </p>
             

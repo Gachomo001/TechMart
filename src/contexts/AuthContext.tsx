@@ -54,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
+      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -62,8 +63,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching profile:', error);
-        setProfile(null);
+        // If RLS is blocking the fetch, try a different approach
+        if (error.code === 'PGRST116') {
+          console.log('RLS policy blocked profile fetch, trying alternative method');
+          // Try to fetch just the role to check admin status
+          const { data: roleData, error: roleError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+          
+          if (roleError) {
+            console.error('Error fetching role:', roleError);
+            setProfile(null);
+          } else {
+            console.log('Successfully fetched role:', roleData);
+            // Create a minimal profile with just the role
+            setProfile({
+              id: userId,
+              first_name: '',
+              last_name: '',
+              role: roleData.role,
+              email: user?.email || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          }
+        } else {
+          setProfile(null);
+        }
       } else {
+        console.log('Successfully fetched profile:', data);
         setProfile(data as Profile);
       }
     } catch (error) {

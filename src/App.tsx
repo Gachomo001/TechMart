@@ -217,6 +217,10 @@ function App() {
       <CartProvider>
         <WishlistProvider>
           <div className="min-h-screen bg-gray-50">
+            {/* Global Components - Available on all pages */}
+            <Cart />
+            <Wishlist />
+            
             {/* Customer Routes */}
             <Routes>
               <Route path="/auth" element={<Auth />} />
@@ -239,10 +243,7 @@ function App() {
                   <div className="pt-0" style={{ paddingTop: 'var(--header-height, 0px)' }}>
                     {!searchQuery && !selectedCategory && (
                       <>
-                        <HeroSection 
-                          onShopNowClick={() => window.location.href = '/all-products'}
-                          onViewDealsClick={handleViewDealsClick}
-                        />
+                        <HeroSection />
                         <FeaturedCategories />
                       </>
                     )}
@@ -261,8 +262,6 @@ function App() {
                   <div className="mt-16 sm:mt-20 md:mt-24 lg:mt-32">
                     <Footer />
                   </div>
-                  <Cart />
-                  <Wishlist />
                   {showAuthModal && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                       <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6">
@@ -282,12 +281,16 @@ function App() {
                 path="/profile"
                 element={
                   <>
-                    <Header
-                      onSearch={handleSearch}
-                      onLogoClick={handleLogoClick}
-                      onViewDealsClick={() => navigate('/deals')}
-                    />
-                    <ProfilePage />
+                    <div className="fixed top-0 left-0 right-0 z-50">
+                      <Header
+                        onSearch={handleSearch}
+                        onLogoClick={handleLogoClick}
+                        onViewDealsClick={() => navigate('/deals')}
+                      />
+                    </div>
+                    <div style={{ paddingTop: 'var(--header-height, 0px)' }}>
+                      <ProfilePage />
+                    </div>
                   </>
                 }
               />

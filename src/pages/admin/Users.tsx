@@ -14,7 +14,6 @@ interface Profile {
   phone: string | null;
   status: 'active' | 'inactive';
   avatar_url?: string;
-  full_name?: string;
 }
 
 interface UserStats {
@@ -23,7 +22,8 @@ interface UserStats {
 }
 
 interface EditFormData {
-  full_name: string;
+  first_name: string;
+  last_name: string;
   role: 'customer' | 'admin' | 'super_admin';
 }
 
@@ -35,7 +35,8 @@ const Users: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState<EditFormData>({
-    full_name: '',
+    first_name: '',
+    last_name: '',
     role: 'customer'
   });
   const { isSuperAdmin } = useAuth();
@@ -109,6 +110,30 @@ const Users: React.FC = () => {
     }).format(amount);
   };
 
+  const getDisplayName = (profile: Profile) => {
+    if (profile.first_name && profile.last_name) {
+      return `${profile.first_name} ${profile.last_name}`;
+    } else if (profile.first_name) {
+      return profile.first_name;
+    } else if (profile.last_name) {
+      return profile.last_name;
+    } else {
+      return 'No Name';
+    }
+  };
+
+  const getInitials = (profile: Profile) => {
+    if (profile.first_name && profile.last_name) {
+      return `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}`.toUpperCase();
+    } else if (profile.first_name) {
+      return profile.first_name.charAt(0).toUpperCase();
+    } else if (profile.last_name) {
+      return profile.last_name.charAt(0).toUpperCase();
+    } else {
+      return profile.email.charAt(0).toUpperCase();
+    }
+  };
+
   const handleViewProfile = (profile: Profile) => {
     setSelectedProfile(profile);
     setShowViewModal(true);
@@ -117,13 +142,14 @@ const Users: React.FC = () => {
   const handleEditProfile = (profile: Profile) => {
     setSelectedProfile(profile);
     setEditFormData({
-      full_name: profile.full_name || '',
+      first_name: profile.first_name || '',
+      last_name: profile.last_name || '',
       role: profile.role
     });
     setEditModalOpen(true);
   };
 
-  const handleUpdateProfile = async (profileId: string, updates: { role?: Profile['role']; status?: Profile['status'] }) => {
+  const handleUpdateProfile = async (profileId: string, updates: { first_name?: string; last_name?: string; role?: Profile['role']; status?: Profile['status'] }) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -149,6 +175,8 @@ const Users: React.FC = () => {
     if (selectedProfile) {
       try {
         await handleUpdateProfile(selectedProfile.id, {
+          first_name: editFormData.first_name,
+          last_name: editFormData.last_name,
           role: editFormData.role,
           status: selectedProfile.status
         });
@@ -168,7 +196,7 @@ const Users: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-white">Users</h1>
       </div>
@@ -211,19 +239,19 @@ const Users: React.FC = () => {
                           <img
                             className="h-10 w-10 rounded-full object-cover"
                             src={profile.avatar_url}
-                            alt={profile.full_name || profile.email}
+                            alt={getDisplayName(profile)}
                           />
                         ) : (
                           <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center">
                             <span className="text-slate-300 text-sm font-medium">
-                              {(profile.full_name || profile.email).charAt(0).toUpperCase()}
+                              {getInitials(profile)}
                             </span>
                           </div>
                         )}
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-white">
-                          {profile.full_name || 'No Name'}
+                          {getDisplayName(profile)}
                         </div>
                         <div className="text-sm text-slate-400">
                             {profile.email}
@@ -296,7 +324,7 @@ const Users: React.FC = () => {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-300">Name</label>
-                  <p className="mt-1 text-sm text-white">{selectedProfile.full_name || 'No Name'}</p>
+                  <p className="mt-1 text-sm text-white">{getDisplayName(selectedProfile)}</p>
                 </div>
 
                 <div>
@@ -367,16 +395,29 @@ const Users: React.FC = () => {
 
             <form onSubmit={handleEditSubmit} className="flex-1 overflow-y-auto p-6">
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.full_name}
-                    onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.first_name}
+                      onChange={(e) => setEditFormData({ ...editFormData, first_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.last_name}
+                      onChange={(e) => setEditFormData({ ...editFormData, last_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
 
                 <div>

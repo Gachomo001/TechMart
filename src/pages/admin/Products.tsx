@@ -392,22 +392,24 @@ const Products: React.FC = () => {
 
   return (
     <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
+      <div className="space-y-6">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-white">Products</h1>
-        <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative">
             <input
               type="text"
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 px-4 py-2 pl-10 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full sm:w-64 px-4 py-2 pl-10 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
             <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
           </div>
           <button
             onClick={handleAddProduct}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-5 h-5 mr-2" />
             Add Product
@@ -416,12 +418,66 @@ const Products: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-500/20 text-red-400 rounded-lg">
+          <div className="p-4 bg-red-500/20 text-red-400 rounded-lg">
           {error}
         </div>
       )}
 
-      <div className="w-full bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
+        {/* Mobile Card View */}
+        <div className="lg:hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {filteredProducts.map((product) => {
+              const primaryImage = product.product_images?.find(img => img.is_primary)?.image_url || product.image_url;
+              const stockStatus = getStockStatus(product.stock_quantity);
+              
+              return (
+                <div key={product.id} className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
+                  <div className="flex items-start space-x-3">
+                    {primaryImage && (
+                      <img
+                        src={primaryImage}
+                        alt={product.name}
+                        className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-white truncate">{product.name}</h3>
+                      <p className="text-sm text-slate-300 mt-1">KES {product.price.toLocaleString()}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full
+                          ${stockStatus.text === 'In Stock' ? 'bg-green-500/20 text-green-400' :
+                            stockStatus.text === 'Limited' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-red-500/20 text-red-400'}`}>
+                          {stockStatus.text}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleEdit(product)}
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Stock: {product.stock_quantity} • {categories.find(c => c.id === product.category_id)?.name || '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden lg:block w-full bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="w-full overflow-x-auto">
           <table className="w-full divide-y divide-slate-700/50">
             <thead className="bg-slate-700/30">
@@ -776,6 +832,7 @@ const Products: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

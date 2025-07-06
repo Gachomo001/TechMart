@@ -95,9 +95,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-slate-800/95 backdrop-blur-sm border-r border-slate-700/50">
+        <div className="fixed inset-y-0 left-0 flex w-80 flex-col bg-slate-800/95 backdrop-blur-sm border-r border-slate-700/50">
           <div className="flex h-16 items-center justify-between px-4 border-b border-slate-700/50">
-            <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Admin Panel</h2>
+            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Admin Panel</h2>
             <button
               type="button"
               className="text-slate-400 hover:text-white transition-colors"
@@ -106,25 +106,26 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
               <X className="h-6 w-6" />
             </button>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+          <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`group flex items-center px-3 py-2.5 text-base font-medium rounded-lg transition-colors ${
+                  className={`group flex items-center px-3 py-3 text-base font-medium rounded-lg transition-colors ${
                     location.pathname === item.href
                       ? 'bg-slate-700/50 text-white'
                       : 'text-slate-300 hover:bg-slate-700/30 hover:text-white'
                   }`}
+                  onClick={() => setSidebarOpen(false)}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${
+                  <Icon className={`mr-3 h-5 w-5 flex-shrink-0 ${
                     location.pathname === item.href
                       ? 'text-blue-400'
                       : 'text-slate-400 group-hover:text-blue-400'
                   }`} />
-                  {item.name}
+                  <span className="truncate">{item.name}</span>
                 </Link>
               );
             })}
@@ -134,19 +135,19 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700/30 hover:text-white rounded-lg transition-colors"
+                className="flex w-full items-center justify-between px-3 py-3 text-sm font-medium text-slate-300 hover:bg-slate-700/30 hover:text-white rounded-lg transition-colors"
               >
-                <div className="flex items-center">
-                  <User className="mr-3 h-5 w-5 text-slate-400" />
+                <div className="flex items-center min-w-0">
+                  <User className="mr-3 h-5 w-5 text-slate-400 flex-shrink-0" />
                   <span className="truncate">{user?.email}</span>
                 </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform flex-shrink-0 ${showProfileMenu ? 'rotate-180' : ''}`} />
               </button>
               {showProfileMenu && (
                 <div className="absolute bottom-full left-0 mb-2 w-full bg-slate-800 rounded-lg shadow-lg border border-slate-700/50 overflow-hidden">
                   <Link
                     to="/profile"
-                    className="flex items-center px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/30 hover:text-white transition-colors"
+                    className="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/30 hover:text-white transition-colors"
                     onClick={() => setShowProfileMenu(false)}
                   >
                     <Settings className="mr-3 h-5 w-5 text-slate-400" />
@@ -157,7 +158,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
                       handleSignOut();
                       setShowProfileMenu(false);
                     }}
-                    className="flex w-full items-center px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/30 hover:text-white transition-colors"
+                    className="flex w-full items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/30 hover:text-white transition-colors"
                   >
                     <LogOut className="mr-3 h-5 w-5 text-slate-400" />
                     Sign Out
@@ -248,19 +249,22 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
           >
             <Menu className="h-6 w-6" />
           </button>
+          <div className="flex-1 flex items-center justify-center">
+            <h1 className="text-lg font-semibold text-white">{getPageInfo().title}</h1>
+          </div>
         </div>
 
-        <main className="py-6">
+        <main className="py-4 sm:py-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {/* Page Header */}
-            <div className="relative mb-8">
+            <div className="relative mb-6 sm:mb-8">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl" />
-              <div className="relative flex flex-col md:flex-row md:items-center md:justify-between p-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-white mb-2">{getPageInfo().title}</h1>
-                  <p className="text-slate-300">{getPageInfo().description}</p>
+              <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 sm:p-6">
+                <div className="mb-4 sm:mb-0">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">{getPageInfo().title}</h1>
+                  <p className="text-sm sm:text-base text-slate-300">{getPageInfo().description}</p>
                 </div>
-                <div className="mt-4 md:mt-0">
+                <div>
                   <BackButton text="Back to Store" onClick={() => navigate('/')} />
                 </div>
               </div>

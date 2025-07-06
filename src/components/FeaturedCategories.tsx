@@ -112,7 +112,7 @@ const FeaturedCategories: React.FC = () => {
                   <IconComponent className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">{category.name}</h3>
-                <p className="text-xs sm:text-sm text-gray-600">{category.description || 'Browse our selection'}</p>
+                <p className="text-xs sm:text-sm text-gray-600 line-clamp-3">{category.description || 'Browse our selection'}</p>
               </button>
             );
           })}

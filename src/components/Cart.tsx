@@ -50,7 +50,7 @@ const Cart: React.FC<CartProps> = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50">
+    <div className="fixed inset-0 bg-black/50 z-[60]">
       <div ref={cartRef} className="fixed right-0 top-0 h-full w-full max-w-md bg-slate-900 text-white shadow-xl md:max-w-md overflow-hidden">
         <div className="flex flex-col h-full">
           {/* Header - Fixed */}

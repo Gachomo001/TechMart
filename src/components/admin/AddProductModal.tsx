@@ -29,6 +29,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
   const [price, setPrice] = useState('');
   const [buyingPrice, setBuyingPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
+  const [brand, setBrand] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [stockQuantity, setStockQuantity] = useState('');
@@ -151,6 +152,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
           price: parseFloat(price),
           buying_price: parseFloat(buyingPrice),
           original_price: originalPrice ? parseFloat(originalPrice) : null,
+          brand: brand || null,
           category_id: categoryId || null,
           subcategory_id: subcategoryId || null,
           stock_quantity: parseInt(stockQuantity),
@@ -237,15 +239,27 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Original Price (Optional)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={originalPrice}
-                  onChange={(e) => setOriginalPrice(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Original Price (Optional)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={originalPrice}
+                    onChange={(e) => setOriginalPrice(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Brand</label>
+                  <input
+                    type="text"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g. Samsung, Apple"
+                  />
+                </div>
               </div>
             </div>
 

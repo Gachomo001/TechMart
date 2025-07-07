@@ -17,6 +17,7 @@ interface Product {
   price: number;
   buying_price: number;
   original_price: number | null;
+  brand: string | null;
   category_id: string | null;
   subcategory_id: string | null;
   image_url: string | null;
@@ -60,6 +61,7 @@ const Products: React.FC = () => {
     price: '',
     buying_price: '',
     original_price: '',
+    brand: '',
     category_id: '',
     subcategory_id: '',
     stock_quantity: '0',
@@ -199,6 +201,7 @@ const Products: React.FC = () => {
         price: parseFloat(formData.price),
         buying_price: parseFloat(formData.buying_price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
+        brand: formData.brand || null,
         category_id: formData.category_id || null,
         subcategory_id: formData.subcategory_id || null,
         image_url: imageUrl,
@@ -281,6 +284,7 @@ const Products: React.FC = () => {
       price: product.price.toString(),
       buying_price: product.buying_price.toString(),
       original_price: product.original_price?.toString() || '',
+      brand: product.brand || '',
       category_id: product.category_id || '',
       subcategory_id: product.subcategory_id || '',
       stock_quantity: product.stock_quantity.toString(),
@@ -304,6 +308,7 @@ const Products: React.FC = () => {
       price: '',
       buying_price: '',
       original_price: '',
+      brand: '',
       category_id: '',
       subcategory_id: '',
       stock_quantity: '0',
@@ -345,6 +350,7 @@ const Products: React.FC = () => {
       price: '',
       buying_price: '',
       original_price: '',
+      brand: '',
       category_id: '',
       subcategory_id: '',
       stock_quantity: '0',
@@ -665,7 +671,6 @@ const Products: React.FC = () => {
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
                       Buying Price
@@ -679,7 +684,6 @@ const Products: React.FC = () => {
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
                       Original Price
@@ -690,6 +694,18 @@ const Products: React.FC = () => {
                       value={formData.original_price}
                       onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                      Brand
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.brand}
+                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g. Samsung, Apple"
                     />
                   </div>
                 </div>

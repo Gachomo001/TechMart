@@ -12,6 +12,7 @@ import {
   X,
   Upload,
 } from 'lucide-react';
+import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 
 interface Category {
   id: string;
@@ -42,6 +43,8 @@ const Categories: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -74,20 +77,31 @@ const Categories: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
+  const handleDeleteClick = (category: Category) => {
+    setCategoryToDelete(category);
+    setDeleteModalOpen(true);
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!categoryToDelete) return;
     try {
       const { error } = await supabase
         .from('categories')
         .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchCategories();
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      setError('Failed to delete category');
+        .eq('id', categoryToDelete.id);
+      if (error) {
+        if (error.code === '23503' || (error.message && error.message.toLowerCase().includes('foreign key')) ) {
+          setError('Cannot delete this category because it is referenced by other records (e.g., products or subcategories).');
+        } else {
+          setError(error.message || 'Failed to delete category');
+        }
+        return;
+      }
+      await fetchCategories();
+      setDeleteModalOpen(false);
+      setCategoryToDelete(null);
+    } catch (error: any) {
+      setError(error.message || 'Failed to delete category');
     }
   };
 
@@ -325,7 +339,7 @@ const Categories: React.FC = () => {
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(category.id)}
+                          onClick={() => handleDeleteClick(category)}
                           className="text-red-400 hover:text-red-300 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -381,7 +395,7 @@ const Categories: React.FC = () => {
                       <Pencil className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(category.id)}
+                      onClick={() => handleDeleteClick(category)}
                       className="text-red-400 hover:text-red-300 transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -513,6 +527,16 @@ const Categories: React.FC = () => {
           </div>
         </div>
       )}
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setCategoryToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        itemName={categoryToDelete?.name || ''}
+        itemType="category"
+      />
       </div>
     </div>
   );

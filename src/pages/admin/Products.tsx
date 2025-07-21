@@ -8,6 +8,7 @@ import {
   Upload,
   Pencil,
 } from 'lucide-react';
+import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 
 interface Product {
   id: string;
@@ -76,6 +77,8 @@ const Products: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -245,7 +248,14 @@ const Products: React.FC = () => {
           .select()
           .single();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          if (insertError.code === '23503' || (insertError.message && insertError.message.toLowerCase().includes('foreign key')) ) {
+            setError('Failed to add product due to a reference issue (e.g., invalid category or subcategory).');
+          } else {
+            setError(insertError.message || 'Failed to add product');
+          }
+          return;
+        }
 
         // If there's an image, create a product_image record
         if (imageUrl && newProduct) {
@@ -263,9 +273,8 @@ const Products: React.FC = () => {
 
       await fetchData();
       handleCloseModal();
-    } catch (error) {
-      console.error('Error saving product:', error);
-      setError(error instanceof Error ? error.message : 'Failed to save product');
+    } catch (error: any) {
+      setError(error.message || 'Failed to save product');
     }
   };
 
@@ -323,20 +332,32 @@ const Products: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteModalOpen(true);
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
     try {
       const { error } = await supabase
         .from('products')
         .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+        .eq('id', productToDelete.id);
+      if (error) {
+        // Check for foreign key violation (Postgres error code 23503)
+        if (error.code === '23503' || (error.message && error.message.toLowerCase().includes('foreign key')) ) {
+          setError('Cannot delete this product because it is referenced in one or more orders.');
+        } else {
+          setError(error.message || 'Failed to delete product');
+        }
+        return;
+      }
       await fetchData();
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      setError('Failed to delete product');
+      setDeleteModalOpen(false);
+      setProductToDelete(null);
+    } catch (error: any) {
+      setError(error.message || 'Failed to delete product');
     }
   };
 
@@ -464,7 +485,7 @@ const Products: React.FC = () => {
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(product.id)}
+                            onClick={() => handleDeleteClick(product)}
                             className="text-red-400 hover:text-red-300 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -541,7 +562,7 @@ const Products: React.FC = () => {
                         <Pencil className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(product.id)}
+                        onClick={() => handleDeleteClick(product)}
                         className="text-red-400 hover:text-red-300 transition-colors"
                       >
                         <Trash2 className="w-5 h-5" />
@@ -849,6 +870,16 @@ const Products: React.FC = () => {
         </div>
       )}
       </div>
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setProductToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        itemName={productToDelete?.name || ''}
+        itemType="product"
+      />
     </div>
   );
 };

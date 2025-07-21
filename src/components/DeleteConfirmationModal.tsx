@@ -6,7 +6,7 @@ interface DeleteConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   itemName: string;
-  itemType: 'county' | 'region';
+  itemType: string;
 }
 
 const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
@@ -40,10 +40,10 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
 
             <div className="text-center mb-6">
               <h3 className="text-lg font-semibold text-white mb-2">
-                Delete {itemType === 'county' ? 'County' : 'Region'}
+                Delete {itemType.charAt(0).toUpperCase() + itemType.slice(1)}
               </h3>
               <p className="text-slate-300">
-                Are you sure you want to delete {itemType === 'county' ? 'the county' : 'the region'} "{itemName}"?
+                Are you sure you want to delete the {itemType} "{itemName}"?
                 {itemType === 'county' && ' This will also delete all regions associated with this county.'}
               </p>
             </div>
@@ -53,7 +53,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
                 onClick={onConfirm}
                 className="w-full px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800"
               >
-                Delete {itemType === 'county' ? 'County' : 'Region'}
+                Delete {itemType.charAt(0).toUpperCase() + itemType.slice(1)}
               </button>
               <button
                 onClick={onClose}

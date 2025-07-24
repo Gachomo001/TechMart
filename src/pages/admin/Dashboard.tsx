@@ -134,6 +134,9 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [cleanupMessage, setCleanupMessage] = useState<string | null>(null);
+
 
   useEffect(() => {
     fetchDashboardData();
@@ -375,6 +378,26 @@ const Dashboard: React.FC = () => {
       console.error('Error fetching dashboard data:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
       setLoading(false);
+    }
+  };
+
+  const handleCleanupOrphanImages = async () => {
+    setIsCleaningUp(true);
+    setCleanupMessage(null);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-orphan-images');
+
+      if (error) {
+        throw error;
+      }
+
+      setCleanupMessage(data.message || 'Cleanup process completed.');
+    } catch (error: any) {
+      setError(error.message || 'Failed to clean up orphan images.');
+    } finally {
+      setIsCleaningUp(false);
     }
   };
 
@@ -635,6 +658,25 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Cleanup Orphan Images */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-700/50 flex items-center justify-between">
+          <h3 className="text-base sm:text-lg font-medium text-white">System Maintenance</h3>
+        </div>
+        <div className="p-4 sm:p-6">
+          <p className="text-sm text-slate-300 mb-4">
+            Remove any product images from storage that are no longer associated with any product. This helps to keep the storage bucket clean and reduce costs.
+          </p>
+          <button
+            onClick={handleCleanupOrphanImages}
+            disabled={isCleaningUp}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCleaningUp ? 'Cleaning up...' : 'Clean Up Orphan Images'}
+          </button>
+          {cleanupMessage && <p className="text-green-400 mt-4">{cleanupMessage}</p>}
+        </div>
+      </div>
 
       {/* Recent Orders */}
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
@@ -754,4 +796,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

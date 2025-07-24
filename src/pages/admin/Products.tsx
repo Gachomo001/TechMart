@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 
+const LAPTOP_CATEGORY_ID = 'd387a180-23f0-4427-8b22-b076320fdfc6';
+
 interface Product {
   id: string;
   name: string;
@@ -73,8 +75,8 @@ const Products: React.FC = () => {
   });
   // For dynamic specifications UI
   const [specArray, setSpecArray] = useState<{ key: string; value: string }[]>([]);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<(File | null)[]>([null, null, null]);
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null, null]);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -129,12 +131,16 @@ const Products: React.FC = () => {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedImage(file);
-      const previewUrl = URL.createObjectURL(file);
-      setImagePreview(previewUrl);
+      const newSelectedImages = [...selectedImages];
+      newSelectedImages[index] = file;
+      setSelectedImages(newSelectedImages);
+
+      const newImagePreviews = [...imagePreviews];
+      newImagePreviews[index] = URL.createObjectURL(file);
+      setImagePreviews(newImagePreviews);
     }
   };
 
@@ -185,17 +191,22 @@ const Products: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      let imageUrl = formData.image_url;
+    setError(null);
 
-      if (selectedImage) {
-        try {
-          imageUrl = await uploadImage(selectedImage);
-        } catch (error) {
-          setError(error instanceof Error ? error.message : 'Failed to upload image');
-          return;
+    const isLaptop = formData.category_id === LAPTOP_CATEGORY_ID;
+
+    try {
+      setIsUploading(true);
+      const uploadedImageUrls: string[] = [];
+      const imagesToUpload = isLaptop ? selectedImages : [selectedImages[0]];
+
+      for (const imageFile of imagesToUpload) {
+        if (imageFile) {
+          const url = await uploadImage(imageFile);
+          uploadedImageUrls.push(url);
         }
       }
+      setIsUploading(false);
 
       const productData = {
         name: formData.name,
@@ -207,85 +218,54 @@ const Products: React.FC = () => {
         brand: formData.brand || null,
         category_id: formData.category_id || null,
         subcategory_id: formData.subcategory_id || null,
-        image_url: imageUrl,
         stock_quantity: parseInt(formData.stock_quantity),
         is_featured: formData.is_featured,
         is_bestseller: formData.is_bestseller,
         specifications: specArray.length > 0 ? Object.fromEntries(specArray.map(({ key, value }) => [key, value])) : {},
+        image_url: uploadedImageUrls[0] || (editingProduct ? editingProduct.image_url : null),
       };
 
+      let product: Product;
       if (editingProduct) {
-        const { error: updateError } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id);
-
-        if (updateError) throw updateError;
-
-        // If this is a new image upload, also create a product_image record
-        if (selectedImage && imageUrl) {
-          // First, set all existing images to non-primary
-          await supabase
-            .from('product_images')
-            .update({ is_primary: false })
-            .eq('product_id', editingProduct.id);
-
-          // Then insert the new primary image
-          const { error: imageError } = await supabase
-            .from('product_images')
-            .insert([{
-              product_id: editingProduct.id,
-              image_url: imageUrl,
-              is_primary: true
-            }]);
-
-          if (imageError) throw imageError;
-        }
+        const { data, error } = await supabase.from('products').update(productData).eq('id', editingProduct.id).select().single();
+        if (error) throw error;
+        product = data;
       } else {
-        const { data: newProduct, error: insertError } = await supabase
-          .from('products')
-          .insert([productData])
-          .select()
-          .single();
+        const { data, error } = await supabase.from('products').insert(productData).select().single();
+        if (error) throw error;
+        product = data;
+      }
 
-        if (insertError) {
-          if (insertError.code === '23503' || (insertError.message && insertError.message.toLowerCase().includes('foreign key')) ) {
-            setError('Failed to add product due to a reference issue (e.g., invalid category or subcategory).');
-          } else {
-            setError(insertError.message || 'Failed to add product');
-          }
-          return;
+      if (uploadedImageUrls.length > 0) {
+        // Delete old images if editing
+        if (editingProduct) {
+          await supabase.from('product_images').delete().eq('product_id', product.id);
         }
+        
+        const imagesToInsert = uploadedImageUrls.map((url, index) => ({
+          product_id: product.id,
+          image_url: url,
+          is_primary: index === 0,
+        }));
 
-        // If there's an image, create a product_image record
-        if (imageUrl && newProduct) {
-          const { error: imageError } = await supabase
-            .from('product_images')
-            .insert([{
-              product_id: newProduct.id,
-              image_url: imageUrl,
-              is_primary: true
-            }]);
-
-          if (imageError) throw imageError;
-        }
+        const { error: imageError } = await supabase.from('product_images').insert(imagesToInsert);
+        if (imageError) throw imageError;
       }
 
       await fetchData();
       handleCloseModal();
     } catch (error: any) {
       setError(error.message || 'Failed to save product');
+      setIsUploading(false);
     }
   };
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    // Get the primary image URL or fallback to the product's image_url
-    const primaryImage = product.product_images?.find(img => img.is_primary)?.image_url || product.image_url;
-    // Convert specifications object to array for UI
     const specs = product.specifications && typeof product.specifications === 'object'
       ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: String(value) }))
       : [];
+    
     setFormData({
       name: product.name,
       slug: product.slug,
@@ -300,11 +280,25 @@ const Products: React.FC = () => {
       is_featured: product.is_featured,
       is_bestseller: product.is_bestseller,
       specifications: product.specifications || {},
-      image_url: primaryImage || ''
+      image_url: product.image_url || ''
     });
     setSpecArray(specs);
-    // Set the image preview to the primary image URL
-    setImagePreview(primaryImage);
+
+    const previews = Array(3).fill(null);
+    if (product.category_id === LAPTOP_CATEGORY_ID) {
+      if (product.product_images) {
+        product.product_images.forEach((img, index) => {
+          if (index < 3) {
+            previews[index] = img.image_url;
+          }
+        });
+      }
+    } else {
+      previews[0] = product.image_url || null;
+    }
+    setImagePreviews(previews);
+    
+    setSelectedImages([null, null, null]);
     setIsModalOpen(true);
   };
 
@@ -327,8 +321,8 @@ const Products: React.FC = () => {
       image_url: ''
     });
     setSpecArray([]);
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedImages([null, null, null]);
+    setImagePreviews([null, null, null]);
     setIsModalOpen(true);
   };
 
@@ -340,19 +334,20 @@ const Products: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productToDelete.id);
+      const { error } = await supabase.functions.invoke('delete-product', {
+        body: { productId: productToDelete.id },
+      });
+
       if (error) {
         // Check for foreign key violation (Postgres error code 23503)
-        if (error.code === '23503' || (error.message && error.message.toLowerCase().includes('foreign key')) ) {
+        if (error.message && (error.message.includes('23503') || error.message.toLowerCase().includes('foreign key'))) {
           setError('Cannot delete this product because it is referenced in one or more orders.');
         } else {
           setError(error.message || 'Failed to delete product');
         }
         return;
       }
+
       await fetchData();
       setDeleteModalOpen(false);
       setProductToDelete(null);
@@ -380,8 +375,8 @@ const Products: React.FC = () => {
       specifications: {},
       image_url: ''
     });
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedImages([null, null, null]);
+    setImagePreviews([null, null, null]);
   };
 
   const getStockStatus = (quantity: number) => {
@@ -810,41 +805,83 @@ const Products: React.FC = () => {
                   <label className="block text-sm font-medium text-slate-300 mb-1">
                     Product Image
                   </label>
-                  <div className="mt-1 flex items-center space-x-4">
-                    <div className="flex-shrink-0">
-                      {imagePreview ? (
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="h-20 w-20 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="h-20 w-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                          <Upload className="w-8 h-8 text-gray-400" />
+                  {formData.category_id === LAPTOP_CATEGORY_ID ? (
+                    <div className="grid grid-cols-3 gap-4">
+                      {[0, 1, 2].map(index => (
+                        <div key={index} className="mt-1 flex flex-col items-center space-y-2">
+                          <div className="flex-shrink-0">
+                            {imagePreviews[index] ? (
+                              <img
+                                src={imagePreviews[index] as string}
+                                alt={`Preview ${index + 1}`}
+                                className="h-20 w-20 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="h-20 w-20 rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center">
+                                <Upload className="w-8 h-8 text-slate-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageChange(e, index)}
+                              className="hidden"
+                              id={`image-upload-${index}`}
+                            />
+                            <label
+                              htmlFor={`image-upload-${index}`}
+                              className="cursor-pointer inline-flex items-center px-4 py-2 border border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-300 bg-slate-700/50 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              {selectedImages[index] ? 'Change' : 'Upload'}
+                            </label>
+                            {selectedImages[index] && (
+                              <p className="mt-1 text-xs text-slate-400 truncate w-24">
+                                {selectedImages[index]?.name}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                    <div className="flex-1">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                        id="image-upload"
-                      />
-                      <label
-                        htmlFor="image-upload"
-                        className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      >
-                        {selectedImage ? 'Change Image' : 'Upload Image'}
-                      </label>
-                      {selectedImage && (
-                        <p className="mt-1 text-sm text-gray-500">
-                          {selectedImage.name}
-                        </p>
-                      )}
+                  ) : (
+                    <div className="mt-1 flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        {imagePreviews[0] ? (
+                          <img
+                            src={imagePreviews[0] as string}
+                            alt="Preview"
+                            className="h-20 w-20 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="h-20 w-20 rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center">
+                            <Upload className="w-8 h-8 text-slate-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageChange(e, 0)}
+                          className="hidden"
+                          id="image-upload-0"
+                        />
+                        <label
+                          htmlFor="image-upload-0"
+                          className="cursor-pointer inline-flex items-center px-4 py-2 border border-slate-600 rounded-md shadow-sm text-sm font-medium text-slate-300 bg-slate-700/50 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                          {selectedImages[0] ? 'Change Image' : 'Upload Image'}
+                        </label>
+                        {selectedImages[0] && (
+                          <p className="mt-1 text-sm text-slate-400">
+                            {selectedImages[0]?.name}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </form>
             </div>
@@ -884,4 +921,4 @@ const Products: React.FC = () => {
   );
 };
 
-export default Products; 
+export default Products;

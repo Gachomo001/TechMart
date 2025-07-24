@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import AddSubCategoryModal from '../../components/admin/AddSubCategoryModal';
@@ -24,6 +25,7 @@ const SubCategories: React.FC = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [subCategoryToDelete, setSubCategoryToDelete] = useState<SubCategory | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { isSuperAdmin } = useAuth();
 
   useEffect(() => {
     fetchSubCategories();
@@ -141,12 +143,14 @@ const SubCategories: React.FC = () => {
                     >
                       <Edit className="h-5 w-5" />
                     </button>
-                    <button
-                      onClick={() => handleDeleteClick(subCategory)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleDeleteClick(subCategory)}
+                        className="text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 {subCategory.description && (
@@ -179,4 +183,4 @@ const SubCategories: React.FC = () => {
   );
 };
 
-export default SubCategories; 
+export default SubCategories;

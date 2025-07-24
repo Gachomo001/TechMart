@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
   Plus,
@@ -45,6 +46,7 @@ const Categories: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const { isSuperAdmin } = useAuth();
 
   useEffect(() => {
     fetchCategories();
@@ -338,12 +340,14 @@ const Categories: React.FC = () => {
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteClick(category)}
-                          className="text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => handleDeleteClick(category)}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -394,12 +398,14 @@ const Categories: React.FC = () => {
                     >
                       <Pencil className="w-5 h-5" />
                     </button>
-                    <button
-                      onClick={() => handleDeleteClick(category)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleDeleteClick(category)}
+                        className="text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -542,4 +548,4 @@ const Categories: React.FC = () => {
   );
 };
 
-export default Categories; 
+export default Categories;

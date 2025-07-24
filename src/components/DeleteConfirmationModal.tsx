@@ -1,10 +1,10 @@
-import React from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>;
   itemName: string;
   itemType: string;
 }
@@ -16,7 +16,19 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   itemName,
   itemType
 }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setIsDeleting(false);
+      onClose(); 
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -50,14 +62,23 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
 
             <div className="flex flex-col space-y-3">
               <button
-                onClick={onConfirm}
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+                onClick={handleConfirm}
+                disabled={isDeleting}
+                className="w-full flex justify-center items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:bg-red-400 disabled:cursor-not-allowed"
               >
-                Delete {itemType.charAt(0).toUpperCase() + itemType.slice(1)}
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  `Delete ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`
+                )}
               </button>
               <button
                 onClick={onClose}
-                className="w-full px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                disabled={isDeleting}
+                className="w-full px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -69,4 +90,4 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   );
 };
 
-export default DeleteConfirmationModal; 
+export default DeleteConfirmationModal;

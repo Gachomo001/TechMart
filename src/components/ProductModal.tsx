@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Star, ShoppingCart, Heart, Truck, Shield, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Star, ShoppingCart, Heart, Truck, Shield, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { useCart } from '../contexts/CartContext';
@@ -27,6 +27,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
   const [comment, setComment] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [pendingReview, setPendingReview] = React.useState<{ rating: number; comment: string } | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    if (product) {
+      setCurrentImageIndex(0);
+    }
+  }, [product]);
 
   React.useEffect(() => {
     if (product?.id) {
@@ -232,10 +239,27 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
             <div className="space-y-4">
               <div className="relative">
                 <img
-                  src={product.image_url as string}
+                  src={product.product_images && product.product_images.length > 0 ? product.product_images[currentImageIndex].image_url : product.image_url as string}
                   alt={product.name}
                   className="w-full h-96 object-cover rounded-xl"
                 />
+                
+                {product.product_images && product.product_images.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setCurrentImageIndex((prevIndex) => (prevIndex === 0 ? product.product_images!.length - 1 : prevIndex - 1))}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white/80 rounded-full p-2 transition-colors"
+                    >
+                      <ChevronLeft className="w-6 h-6 text-gray-800" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentImageIndex((prevIndex) => (prevIndex === product.product_images!.length - 1 ? 0 : prevIndex + 1))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white/80 rounded-full p-2 transition-colors"
+                    >
+                      <ChevronRight className="w-6 h-6 text-gray-800" />
+                    </button>
+                  </>
+                )}
                 
                 {/* Badges */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -251,13 +275,26 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                   )}
                 </div>
               </div>
+              {product.product_images && product.product_images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto">
+                  {product.product_images.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image.image_url}
+                      alt={`${product.name} thumbnail ${index + 1}`}
+                      className={`w-20 h-20 object-cover rounded-lg cursor-pointer border-2 ${currentImageIndex === index ? 'border-blue-600' : 'border-transparent'}`}
+                      onClick={() => setCurrentImageIndex(index)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Product Info */}
             <div className="space-y-6">
               <div>
                 <p className="text-sm text-blue-600 font-medium uppercase tracking-wide">
-                  {product.subcategory_id}
+                  {product.subcategory}
                 </p>
                 <h1 className="text-3xl font-bold text-gray-900 mt-2">
                   {product.name}
@@ -296,9 +333,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                   )}
                   <span className="text-4xl font-bold text-gray-900">
                     KES {product.price.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-gray-600">
-                    Buying Price: KES {product.buying_price.toLocaleString()}
                   </span>
                 </div>
                 {discountPercentage > 0 && (

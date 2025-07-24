@@ -13,16 +13,35 @@ interface SubCategory {
   category_id: string;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  buying_price: number;
+  original_price: number | null;
+  brand: string | null;
+  category_id: string;
+  subcategory_id: string;
+  stock_quantity: number;
+  is_featured: boolean;
+  is_bestseller: boolean;
+  specifications: any;
+  product_images: { image_url: string }[];
+}
+
 interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductAdded: () => void;
+  productToEdit?: Product | null;
 }
 
 const AddProductModal: React.FC<AddProductModalProps> = ({
   isOpen,
   onClose,
   onProductAdded,
+  productToEdit,
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -39,13 +58,42 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
   const [images, setImages] = useState<File[]>([]);
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<{ url: string; toDelete: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+    if (productToEdit) {
+      setName(productToEdit.name);
+      setDescription(productToEdit.description);
+      setPrice(productToEdit.price.toString());
+      setBuyingPrice(productToEdit.buying_price.toString());
+      setOriginalPrice(productToEdit.original_price?.toString() || '');
+      setBrand(productToEdit.brand || '');
+      setCategoryId(productToEdit.category_id);
+      setSubcategoryId(productToEdit.subcategory_id);
+      setStockQuantity(productToEdit.stock_quantity.toString());
+      setIsFeatured(productToEdit.is_featured);
+      setIsBestseller(productToEdit.is_bestseller);
+      setExistingImages(productToEdit.product_images.map(img => ({ url: img.image_url, toDelete: false })));
+    } else {
+      // Reset form when adding a new product
+      setName('');
+      setDescription('');
+      setPrice('');
+      setBuyingPrice('');
+      setOriginalPrice('');
+      setBrand('');
+      setCategoryId('');
+      setSubcategoryId('');
+      setStockQuantity('');
+      setIsFeatured(false);
+      setIsBestseller(false);
+      setExistingImages([]);
+      setImages([]);
+    }
+  }, [productToEdit, isOpen]);
 
   useEffect(() => {
     if (categoryId) {
@@ -81,7 +129,10 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
 
   const removeImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
-    setUploadedUrls(uploadedUrls.filter((_, i) => i !== index));
+  };
+
+  const toggleDeleteExistingImage = (index: number) => {
+    setExistingImages(existingImages.map((img, i) => i === index ? { ...img, toDelete: !img.toDelete } : img));
   };
 
   const uploadImages = async (productId: string) => {
@@ -139,35 +190,58 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
     setError(null);
 
     try {
-      // Create slug from name
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const productData = {
+        name,
+        slug,
+        description,
+        price: parseFloat(price),
+        buying_price: parseFloat(buyingPrice),
+        original_price: originalPrice ? parseFloat(originalPrice) : null,
+        brand: brand || null,
+        category_id: categoryId || null,
+        subcategory_id: subcategoryId || null,
+        stock_quantity: parseInt(stockQuantity),
+        is_featured: isFeatured,
+        is_bestseller: isBestseller,
+        specifications: specifications.length > 0 ? Object.fromEntries(specifications.map(({ key, value }) => [key, value])) : null,
+      };
 
-      // Insert product
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .insert({
-          name,
-          slug,
-          description,
-          price: parseFloat(price),
-          buying_price: parseFloat(buyingPrice),
-          original_price: originalPrice ? parseFloat(originalPrice) : null,
-          brand: brand || null,
-          category_id: categoryId || null,
-          subcategory_id: subcategoryId || null,
-          stock_quantity: parseInt(stockQuantity),
-          is_featured: isFeatured,
-          is_bestseller: isBestseller,
-          specifications: specifications.length > 0 ? Object.fromEntries(specifications.map(({ key, value }) => [key, value])) : null,
-        })
-        .select()
-        .single();
+      let productId: string;
 
-      if (productError) throw productError;
+      if (productToEdit) {
+        // Update existing product
+        const { data, error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', productToEdit.id)
+          .select()
+          .single();
+        if (error) throw error;
+        productId = data.id;
 
-      // Upload images if any
+        // Handle image deletions
+        const imagesToDelete = existingImages.filter(img => img.toDelete).map(img => img.url);
+        if (imagesToDelete.length > 0) {
+          await supabase.from('product_images').delete().in('image_url', imagesToDelete);
+          // Also delete from storage bucket
+          const filePaths = imagesToDelete.map(url => new URL(url).pathname.split('/products/')[1]);
+          await supabase.storage.from('products').remove(filePaths);
+        }
+      } else {
+        // Insert new product
+        const { data, error } = await supabase
+          .from('products')
+          .insert(productData)
+          .select()
+          .single();
+        if (error) throw error;
+        productId = data.id;
+      }
+
+      // Upload new images
       if (images.length > 0) {
-        await uploadImages(product.id);
+        await uploadImages(productId);
       }
 
       onProductAdded();
@@ -185,7 +259,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-slate-700/50">
         <div className="flex justify-between items-center p-4 sm:p-6 border-b border-slate-700/50">
-          <h2 className="text-lg sm:text-xl font-semibold text-white">Add New Product</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-white">{productToEdit ? 'Edit Product' : 'Add New Product'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-300 transition-colors">
             <X className="h-5 w-5" />
           </button>
@@ -193,28 +267,15 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Price</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
             </div>
 
             <div>
@@ -229,6 +290,17 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Buying Price</label>
                 <input
                   type="number"
@@ -239,27 +311,25 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                   required
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Original Price (Optional)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={originalPrice}
-                    onChange={(e) => setOriginalPrice(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Brand</label>
-                  <input
-                    type="text"
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g. Samsung, Apple"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Original Price (Optional)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Brand</label>
+                <input
+                  type="text"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g. Samsung, Apple"
+                />
               </div>
             </div>
 
@@ -308,7 +378,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex items-center space-x-4">
               <label className="flex items-center">
                 <input
                   type="checkbox"
@@ -349,19 +419,35 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                   Choose Files
                 </label>
               </div>
-              {images.length > 0 && (
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(existingImages.length > 0 || images.length > 0) && (
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {existingImages.map((image, index) => (
+                    <div key={`existing-${index}`} className="relative aspect-square">
+                      <img
+                        src={image.url}
+                        alt={`Existing Image ${index + 1}`}
+                        className={`w-full h-full object-cover rounded-md ${image.toDelete ? 'opacity-50' : ''}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleDeleteExistingImage(index)}
+                        className={`absolute top-1 right-1 text-white rounded-full p-1 ${image.toDelete ? 'bg-green-500' : 'bg-red-500'}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
                   {images.map((image, index) => (
-                    <div key={index} className="relative">
+                    <div key={`new-${index}`} className="relative aspect-square">
                       <img
                         src={URL.createObjectURL(image)}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-20 object-cover rounded"
+                        alt={`New Preview ${index + 1}`}
+                        className="w-full h-full object-cover rounded-md"
                       />
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -393,7 +479,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
             onClick={handleSubmit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {loading ? 'Creating...' : 'Create Product'}
+            {loading ? (productToEdit ? 'Updating...' : 'Creating...') : (productToEdit ? 'Update Product' : 'Create Product')}
           </button>
         </div>
       </div>
@@ -401,4 +487,4 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
   );
 };
 
-export default AddProductModal; 
+export default AddProductModal;

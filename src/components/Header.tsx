@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect, } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import TopBar from './TopBar';
@@ -9,7 +9,7 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
-  description: string | null;
+  description?: string;
   image_url: string | null;
 }
 

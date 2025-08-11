@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Phone, Mail, Truck, HelpCircle, User as UserIcon, Settings, LayoutDashboard, LogOut } from 'lucide-react';
+import { Phone, Mail, Truck, User as UserIcon, Settings, LayoutDashboard, LogOut } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -71,17 +71,7 @@ export const TopBar = () => {
             <Truck size={16} />
             <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Track Order</span>
           </button>
-          <button 
-            onClick={(e) => {
-              e.preventDefault();
-              // Help functionality can be added here
-            }}
-            className="hover:bg-blue-700 p-1 rounded flex items-center"
-            aria-label="Help Center"
-          >
-            <HelpCircle size={16} />
-            <span className="sr-only sm:not-sr-only sm:ml-1">Help</span>
-          </button>
+
           <div className="relative" ref={profileMenuRef}>
             <button 
               onClick={() => setShowProfileMenu(!showProfileMenu)}

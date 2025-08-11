@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, ShoppingCart, Heart, Menu, ChevronDown, User, Settings, LayoutDashboard, LogOut } from 'lucide-react';
+import { Search, ShoppingCart, Heart, Menu, ChevronDown, User, Settings, LayoutDashboard, LogOut, Monitor } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
@@ -80,12 +80,15 @@ const MainHeader: React.FC<MainHeaderProps> = ({
 
   return (
     <div className="bg-white shadow-sm">
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-5 py-5">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to="/" className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 leading-tight pb-0.5">
-              Raiyaaa
+            <Link to="/" className="flex items-center text-2xl sm:text-3xl lg:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 leading-tight pb-0.5">
+              <Monitor className="h-7 w-7 md:h-9 md:w-9 text-blue-600 mr-2 md:mr-4" />
+              <span className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 leading-normal">
+                Raiyaaa
+              </span>
             </Link>
           </div>
 

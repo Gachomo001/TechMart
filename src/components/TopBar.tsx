@@ -6,7 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 export const TopBar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, profile } = useAuth();
+  const isAdminUser = profile?.role === 'admin' || profile?.role === 'super_admin';
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -102,7 +103,7 @@ export const TopBar = () => {
                       <Settings className="w-4 h-4 mr-2" />
                       <span>Edit Profile</span>
                     </Link>
-                    {isAdmin && (
+                    {isAdminUser && (
                       <Link
                         to="/admin"
                         onClick={() => setShowProfileMenu(false)}

@@ -29,7 +29,8 @@ const MainHeader: React.FC<MainHeaderProps> = ({
   const navigate = useNavigate();
   const { getTotalItems, toggleCart } = useCart();
   const { state: wishlistState, toggleWishlist } = useWishlist();
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, profile } = useAuth();
+  const isAdminUser = profile?.role === 'admin' || profile?.role === 'super_admin';
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -164,7 +165,7 @@ const MainHeader: React.FC<MainHeaderProps> = ({
                         <Settings className="w-4 h-4 mr-2" />
                         <span>Edit Profile</span>
                       </Link>
-                      {isAdmin && (
+                      {isAdminUser && (
                         <Link
                           to="/admin"
                           onClick={() => setShowProfileMenu(false)}

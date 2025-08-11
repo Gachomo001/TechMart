@@ -82,9 +82,12 @@ const Cart: React.FC<CartProps> = () => {
                   <div key={item.product.id} className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
                     <div className="flex gap-4">
                       <img
-                        src={item.product.image}
+                        src={item.product.image_url || 'https://via.placeholder.com/100'}
                         alt={item.product.name}
                         className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100';
+                        }}
                       />
                       
                       <div className="flex-1 min-w-0">

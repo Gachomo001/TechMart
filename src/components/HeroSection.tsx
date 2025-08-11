@@ -1,243 +1,289 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { Product } from '../types';
+import PromotionBar from './PromotionBar';
 
-interface BestSellingProduct {
-  id: string;
-  name: string;
-  slug: string;
-  price: number;
-  image_url: string | null;
-  rating: number | null;
-  review_count: number | null;
+interface ProductImage {
+  image_url: string;
+  is_primary: boolean;
+}
+import HorizontalCarousel from './HorizontalCarousel';
+
+interface Slide {
+  id: number;
+  title: string;
+  subtitle: string;
+  price: string;
+  buttonText: string;
+  image: string;
 }
 
-const HeroSection: React.FC = () => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [bestSellingProducts, setBestSellingProducts] = useState<BestSellingProduct[]>([]);
+const HeroSection: React.FC = (): JSX.Element => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [bestsellers, setBestsellers] = useState<Product[]>([]);
+  const [deals, setDeals] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const autoSlideInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch top 5 best-selling products from database
+  const SLIDE_INTERVAL = 8000; // 8 seconds
+
+  // Tech-focused banner slides (excluding Smartphones and Smart Home)
+  const slides: Slide[] = [
+    {
+      id: 1,
+      title: 'Latest Laptops',
+      subtitle: 'Powerful performance for work and play',
+      price: 'Starting at KES 12,999',
+      buttonText: 'Shop Now',
+      image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2071&q=80'
+    },
+    {
+      id: 3,
+      title: 'Gaming PCs',
+      subtitle: 'Ultimate gaming experience',
+      price: 'Custom builds available',
+      buttonText: 'Build Yours',
+      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2070&q=80'
+    },
+    {
+      id: 4,
+      title: 'Audio & Headphones',
+      subtitle: 'Immersive sound experience',
+      price: 'Starting at KES 1,499',
+      buttonText: 'Listen Now',
+      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2070&q=80'
+    },
+    {
+      id: 6,
+      title: 'Wearables',
+      subtitle: 'Track your fitness and more',
+      price: 'Up to 25% off',
+      buttonText: 'Shop Now',
+      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1999&q=80'
+    }
+  ];
+
+  // Fetch bestsellers and deals
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch bestsellers
+      const { data: bestsellersData } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_bestseller', true)
+        .limit(6);
+      
+      // Fetch products with discounts (deals) - get top 10 by discount percentage
+      const { data: dealsData } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_images(image_url, is_primary)
+        `)
+        .not('original_price', 'is', null)
+        .order('created_at', { ascending: false });
+      
+      if (bestsellersData) setBestsellers(bestsellersData);
+      
+      if (dealsData) {
+        // Calculate discount percentage for each product
+        const productsWithDiscounts = dealsData.map(product => {
+          const discount = ((product.original_price - product.price) / product.original_price) * 100;
+          return {
+            ...product,
+            discount_percentage: Math.round(discount)
+          };
+        });
+        
+        // Sort by discount percentage (highest first) and take top 10
+        const sortedDeals = [...productsWithDiscounts]
+          .sort((a, b) => b.discount_percentage - a.discount_percentage)
+          .slice(0, 10);
+        
+        // Map to include primary image
+        const dealsWithImages = sortedDeals.map(product => ({
+          ...product,
+          // Use primary image if available, otherwise first image, otherwise empty string
+          image_url: product.product_images?.find((img: ProductImage) => img.is_primary)?.image_url || 
+                    (product.product_images?.[0]?.image_url || '')
+        }));
+        
+        setDeals(dealsWithImages);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchBestSellingProducts = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
-            id,
-            name,
-            slug,
-            price,
-            image_url,
-            rating,
-            review_count,
-            is_bestseller
-          `)
-          .or('is_bestseller.eq.true,rating.gte.4.0')
-          .order('rating', { ascending: false })
-          .order('review_count', { ascending: false })
-          .order('is_bestseller', { ascending: false })
-          .limit(5);
-        if (error) {
-          console.error('Error fetching best-selling products:', error);
-          return;
-        }
-        if (data && data.length < 5) {
-          const { data: additionalProducts, error: additionalError } = await supabase
-            .from('products')
-            .select(`
-              id,
-              name,
-              slug,
-              price,
-              image_url,
-              rating,
-              review_count,
-              is_bestseller
-            `)
-            .not('id', 'in', `(${data?.map(p => p.id).join(',')})`)
-            .order('rating', { ascending: false })
-            .order('review_count', { ascending: false })
-            .limit(5 - (data?.length || 0));
-          if (!additionalError && additionalProducts) {
-            setBestSellingProducts([...(data || []), ...additionalProducts]);
-          } else {
-            setBestSellingProducts(data || []);
-          }
-        } else {
-          setBestSellingProducts(data || []);
-        }
-      } catch (error) {
-        console.error('Error fetching best-selling products:', error);
-      } finally {
-        setLoading(false);
+    fetchProducts();
+  }, [fetchProducts]);
+
+  const startAutoSlide = useCallback(() => {
+    // Clear any existing interval
+    if (autoSlideInterval.current) {
+      clearInterval(autoSlideInterval.current);
+    }
+    
+    // Start a new interval
+    autoSlideInterval.current = setInterval(() => {
+      setCurrentSlide(prev => (prev === slides.length - 1 ? 0 : prev + 1));
+    }, SLIDE_INTERVAL);
+    
+    return autoSlideInterval.current;
+  }, [slides.length]);
+
+  // Initialize auto-slide on component mount
+  useEffect(() => {
+    startAutoSlide();
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (autoSlideInterval.current) {
+        clearInterval(autoSlideInterval.current);
       }
     };
-    fetchBestSellingProducts();
-  }, []);
+  }, [startAutoSlide]);
 
-  // Auto-advance carousel every 5 seconds
-  useEffect(() => {
-    if (bestSellingProducts.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % bestSellingProducts.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [bestSellingProducts.length]);
-
-  const nextImage = () => {
-    if (bestSellingProducts.length === 0) return;
-    setCurrentImageIndex((prev) => (prev + 1) % bestSellingProducts.length);
+  const nextSlide = () => {
+    setCurrentSlide(prev => (prev === slides.length - 1 ? 0 : prev + 1));
+    startAutoSlide(); // Restart the timer on manual navigation
   };
 
-  const prevImage = () => {
-    if (bestSellingProducts.length === 0) return;
-    setCurrentImageIndex((prev) => (prev - 1 + bestSellingProducts.length) % bestSellingProducts.length);
+  const prevSlide = () => {
+    setCurrentSlide(prev => (prev === 0 ? slides.length - 1 : prev - 1));
+    startAutoSlide(); // Restart the timer on manual navigation
   };
 
-  const currentProduct = bestSellingProducts[currentImageIndex];
-
-  // Format price to KES currency
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
-
-  // Get primary image URL for product
-  const getProductImage = (product: BestSellingProduct) => {
-    if (product.image_url) {
-      return product.image_url;
-    }
-    return 'https://images.pexels.com/photos/205421/pexels-photo-205421.jpeg?auto=compress&cs=tinysrgb&w=800';
-  };
-
-  // Debug log to confirm component is rendering
-  useEffect(() => {
-    console.log('HeroSection rendering - buttons should be visible');
-  }, []);
+  if (loading) {
+    return (
+      <div className="relative bg-gray-50 overflow-hidden" style={{ height: 'calc(100vh - var(--header-height, 64px) - 0px)' }}>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <section className="bg-gradient-to-br from-blue-50 to-indigo-100 text-gray-900 overflow-hidden flex items-center" style={{ minHeight: 'calc(100vh - var(--header-height, 0px))' }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-8 lg:py-16">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-          {/* Hero Content - Order 2 on mobile, 1 on desktop */}
-          <div className="order-2 lg:order-1 text-center lg:text-left relative z-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-900 mb-4 lg:mb-6">
-              Build Your
-              <span className="text-blue-600"> Dream</span>
-              <br />Setup Today
-            </h2>
-            <p className="text-lg sm:text-xl text-gray-600 mb-6 lg:mb-8 leading-relaxed">
-              Discover premium computers, cutting-edge accessories, and everything you need 
-              for work, gaming, and creativity. Free shipping on orders over $99.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start relative z-20">
-              <button
-                onClick={() => {
-                  console.log('Shop Now button clicked');
-                  console.log('Attempting to navigate to /all-products');
-                  navigate('/all-products');
-                }}
-                className="bg-blue-600 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center group relative z-30 cursor-pointer"
-                style={{ position: 'relative', zIndex: 999 }}
-              >
-                Shop Now
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-              <button
-                onClick={() => {
-                  console.log('View Deals button clicked');
-                  console.log('Attempting to navigate to /deals');
-                  navigate('/deals');
-                }}
-                className="border-2 border-gray-300 text-gray-700 px-6 lg:px-8 py-3 lg:py-4 rounded-lg font-semibold hover:border-blue-600 hover:text-blue-600 transition-colors relative z-30 cursor-pointer"
-                style={{ position: 'relative', zIndex: 999 }}
-              >
-                View Deals
-              </button>
+    <div className="relative bg-gray-50 overflow-hidden">
+      <div className="flex flex-col" style={{ height: 'calc(100vh - var(--header-height, 64px) - 0px)' }}>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Side - Bestsellers Carousel (25% width) */}
+          <div className="w-1/4 h-full hidden lg:flex flex-col border-r border-gray-200">
+            <div className="flex-1 overflow-hidden bg-white">
+              <HorizontalCarousel 
+                products={bestsellers}
+                title="Bestsellers"
+                showOriginalPrice={false}
+                autoRotate={true}
+                rotateInterval={5000}
+                wishlistPosition="left"
+              />
             </div>
           </div>
-          {/* Product Carousel - Order 1 on mobile, 2 on desktop */}
-          <div className="order-1 lg:order-2 relative z-20 h-full flex items-center mt-6 sm:mt-0">
-            <div className="bg-gradient-to-br from-blue-500/60 to-indigo-500/60 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 backdrop-blur-sm border border-white/10 w-full mx-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-[250px] sm:h-[300px] md:h-[350px]">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                </div>
-              ) : bestSellingProducts.length === 0 ? (
-                <div className="flex items-center justify-center h-[250px] sm:h-[300px] md:h-[350px] text-center">
-                  <div>
-                    <p className="text-lg text-blue-600 mb-2">No products available</p>
-                    <p className="text-sm text-blue-500">Check back soon for our best sellers!</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="relative overflow-hidden rounded-xl sm:rounded-2xl">
-                    <img
-                      src={getProductImage(currentProduct)}
-                      alt={currentProduct.name}
-                      className="w-full h-[250px] sm:h-[300px] md:h-[350px] object-cover shadow-2xl transition-all duration-500"
-                    />
-                    {/* Navigation Arrows */}
-                    <button
-                      onClick={prevImage}
-                      className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 sm:p-3 rounded-full transition-all duration-300 backdrop-blur-sm z-50"
-                    >
-                      <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />
-                    </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 sm:p-3 rounded-full transition-all duration-300 backdrop-blur-sm z-50"
-                    >
-                      <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
-                    </button>
-                    {/* Product Info Overlay */}
-                    <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4 bg-black/60 backdrop-blur-sm rounded-lg sm:rounded-xl p-3 sm:p-4 text-white">
-                      <h3 className="text-lg sm:text-xl font-bold">{currentProduct.name}</h3>
-                      <p className="text-xl sm:text-2xl font-bold text-orange-400">{formatPrice(currentProduct.price)}</p>
+          
+          {/* Middle - Hero Slider (50% width) */}
+          <div className="w-full lg:w-2/4 h-full relative overflow-hidden">
+            <div
+              className="flex transition-transform duration-1000 ease-out h-full"
+              style={{
+                transform: `translateX(-${currentSlide * 100}%)`,
+              }}
+            >
+              {slides.map((slide) => (
+                <div
+                  key={slide.id}
+                  className="min-w-full h-full relative flex items-center justify-center"
+                >
+                  <img
+                    src={slide.image}
+                    alt={slide.title}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40" />
+                  <div className="relative z-10 text-white text-center px-4 max-w-4xl mx-auto">
+                    <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 drop-shadow-lg">
+                      {slide.title}
+                    </h2>
+                    <p className="text-lg md:text-xl lg:text-2xl mb-6 drop-shadow-md">
+                      {slide.subtitle}
+                    </p>
+                    <div className="text-2xl md:text-3xl font-bold mb-8 drop-shadow-md">
+                      {slide.price}
                     </div>
+                    <button 
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 md:px-8 md:py-3 rounded-md transition-all transform hover:scale-105 text-sm md:text-base cursor-default"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      aria-label={slide.buttonText}
+                    >
+                      {slide.buttonText}
+                    </button>
                   </div>
-                  {/* Carousel Indicators */}
-                  <div className="flex justify-center space-x-2 mt-4 sm:mt-6">
-                    {bestSellingProducts.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 z-50 relative ${
-                          index === currentImageIndex 
-                            ? 'bg-orange-500 scale-125' 
-                            : 'bg-blue-200 hover:bg-blue-400'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-              {/* Floating Cards */}
-              <div className="absolute -top-2 -left-2 sm:-top-4 sm:-left-4 bg-white text-gray-900 p-2 sm:p-4 rounded-lg sm:rounded-xl shadow-lg">
-                <div className="text-xs sm:text-sm text-gray-600">Best Sellers</div>
-                <div className="text-sm sm:text-lg font-bold text-green-600">Top Rated</div>
-              </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Navigation Arrows */}
+            <button 
+              onClick={prevSlide}
+              className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-10 bg-black/50 text-white p-1 md:p-2 rounded-full hover:bg-black/70 transition-colors"
+              aria-label="Previous slide"
+            >
+              <ChevronLeft size={24} className="w-5 h-5 md:w-8 md:h-8" />
+            </button>
+            <button 
+              onClick={nextSlide}
+              className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-10 bg-black/50 text-white p-1 md:p-2 rounded-full hover:bg-black/70 transition-colors"
+              aria-label="Next slide"
+            >
+              <ChevronRight size={24} className="w-5 h-5 md:w-8 md:h-8" />
+            </button>
+            
+            {/* Slide Indicators */}
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 z-10">
+              {slides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    index === currentSlide ? 'bg-white' : 'bg-white/50'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+          
+          {/* Right Side - Deals Carousel (25% width) */}
+          <div className="w-1/4 h-full hidden lg:flex flex-col border-l border-gray-200">
+            <div className="flex-1 overflow-hidden bg-white">
+              <HorizontalCarousel 
+                products={deals}
+                title="Hot Deals"
+                showOriginalPrice={true}
+                autoRotate={true}
+                rotateInterval={6000}
+                wishlistPosition="right"
+              />
             </div>
           </div>
         </div>
+        
+        {/* Promotion Bar - Fixed at the bottom of the hero section */}
+        <div className="w-full mt-auto">
+          <PromotionBar />
+        </div>
       </div>
-      {/* Background Pattern - Lower z-index */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-                           radial-gradient(circle at 75% 75%, rgba(168, 85, 247, 0.08) 0%, transparent 50%)`
-        }} />
-      </div>
-    </section>
+    </div>
   );
 };
 

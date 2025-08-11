@@ -337,15 +337,13 @@ const CategoryPage: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInReq
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="fixed top-0 left-0 right-0 z-50">
-        <Header 
-          onSearch={setSearchQuery}
-          onLogoClick={() => navigate('/')}
-          onViewDealsClick={() => navigate('/deals')}
-        />
-      </div>
+      <Header 
+        onSearch={setSearchQuery}
+        onLogoClick={() => navigate('/')}
+        onViewDealsClick={() => navigate('/deals')}
+      />
 
-      <div className="pt-48">
+      <main className="pt-16 lg:pt-2">
         <div className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Filters Sidebar */}
@@ -506,12 +504,9 @@ const CategoryPage: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInReq
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Add spacing above footer */}
-      <div className="mt-16">
-        <Footer />
-      </div>
+      <Footer />
       <Cart />
       <Wishlist />
       <ProductModal

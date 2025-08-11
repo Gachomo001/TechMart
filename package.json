@@ -12,6 +12,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
+    "@nextui-org/react": "^2.6.11",
     "@supabase/supabase-js": "^2.50.0",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@types/crypto-js": "^4.2.2",
@@ -25,6 +26,7 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
+    "framer-motion": "^12.23.12",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "lodash": "^4.17.21",

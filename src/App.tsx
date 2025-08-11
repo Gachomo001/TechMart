@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { CartProvider } from './contexts/CartContext';
 import { WishlistProvider } from './contexts/WishlistContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -31,8 +31,11 @@ import CategoryPage from './pages/CategoryPage';
 import ProfilePage from './pages/ProfilePage';
 import { Product } from './types';
 import { supabase } from './lib/supabase';
+import WhatsAppButton from './components/WhatsAppButton';
+import HotDeals from './components/HotDeals';
 
 function App() {
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -204,13 +207,18 @@ function App() {
     return "Featured Products";
   };
 
-  const handleViewDealsClick = () => {
-    navigate('/deals');
-  };
-
   const handleSignInRequired = () => {
     setShowAuthModal(true);
   };
+
+  // Set CSS variable for header height
+  useEffect(() => {
+    const header = document.querySelector('header');
+    if (header) {
+      const headerHeight = header.offsetHeight;
+      document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+    }
+  }, [searchQuery, selectedCategory]);
 
   return (
     <AuthProvider>
@@ -220,6 +228,7 @@ function App() {
             {/* Global Components - Available on all pages */}
             <Cart />
             <Wishlist />
+            {!location.pathname.startsWith('/admin') && <WhatsAppButton />}
             
             {/* Customer Routes */}
             <Routes>
@@ -232,7 +241,7 @@ function App() {
               <Route path="/payment/test" element={<PaymentTest />} />
               <Route path="/" element={
                 <>
-                  <div className="fixed top-0 left-0 right-0 z-50">
+                  <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
                     <Header 
                       onSearch={handleSearch}
                       onLogoClick={handleLogoClick}
@@ -244,7 +253,10 @@ function App() {
                     {!searchQuery && !selectedCategory && (
                       <>
                         <HeroSection />
-                        <FeaturedCategories />
+                        <HotDeals onSignInRequired={handleSignInRequired} />
+                        <div className="bg-white">
+                          <FeaturedCategories />
+                        </div>
                       </>
                     )}
                     

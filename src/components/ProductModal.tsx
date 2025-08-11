@@ -28,6 +28,48 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
   const [submitting, setSubmitting] = React.useState(false);
   const [pendingReview, setPendingReview] = React.useState<{ rating: number; comment: string } | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [categoryName, setCategoryName] = useState<string | null>(null);
+  const [subcategoryName, setSubcategoryName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (product) {
+      const fetchCategoryData = async () => {
+        if (product.category_id) {
+          const { data, error } = await supabase
+            .from('categories')
+            .select('name')
+            .eq('id', product.category_id)
+            .single();
+          if (!error && data) {
+            setCategoryName(data.name);
+          }
+        }
+        if (product.subcategory_id) {
+          const { data, error } = await supabase
+            .from('subcategories')
+            .select('name')
+            .eq('id', product.subcategory_id)
+            .single();
+          if (!error && data) {
+            setSubcategoryName(data.name);
+          }
+        }
+      };
+
+      fetchCategoryData();
+    }
+  }, [product]);
 
   useEffect(() => {
     if (product) {
@@ -222,7 +264,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] overflow-y-auto transition-all duration-300">
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">Product Details</h2>
           <button
@@ -233,15 +275,15 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
           </button>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Product Image */}
             <div className="space-y-4">
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 <img
                   src={product.product_images && product.product_images.length > 0 ? product.product_images[currentImageIndex].image_url : product.image_url as string}
                   alt={product.name}
-                  className="w-full h-96 object-cover rounded-xl"
+                  className="w-full h-full max-w-full max-h-[600px] object-contain rounded-xl bg-gray-50 border"
                 />
                 
                 {product.product_images && product.product_images.length > 1 && (
@@ -294,7 +336,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
             <div className="space-y-6">
               <div>
                 <p className="text-sm text-blue-600 font-medium uppercase tracking-wide">
-                  {product.subcategory}
+                  {subcategoryName || categoryName || ''}
                 </p>
                 <h1 className="text-3xl font-bold text-gray-900 mt-2">
                   {product.name}
@@ -350,12 +392,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                 </span>
               </div>
 
-              {/* Description */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-                <p className="text-gray-700 leading-relaxed">{product.description}</p>
-              </div>
-
               {/* Action Buttons */}
               <div className="flex gap-4">
                 <button
@@ -379,7 +415,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
               </div>
 
               {/* Benefits */}
-              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+              {/* <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <Truck className="w-5 h-5 text-green-600" />
                   <span className="text-gray-700">Free shipping on orders over $99</span>
@@ -392,22 +428,36 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                   <Shield className="w-5 h-5 text-purple-600" />
                   <span className="text-gray-700">2-year manufacturer warranty</span>
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
 
-          {/* Specifications */}
-          <div className="mt-8 border-t pt-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Specifications</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(product.specifications).map(([key, value]) => (
-                <div key={key} className="flex justify-between py-3 border-b border-gray-200 last:border-b-0">
-                  <span className="font-medium text-gray-900">{key}</span>
-                  <span className="text-gray-700">{String(value)}</span>
-                </div>
-              ))}
+          {/* Description */}
+          {product.description && (
+            <div className="mt-8 border-t pt-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Description</h3>
+              <ul className="space-y-4 list-disc pl-5 text-gray-700">
+                {product.description.split(/✅/).filter(point => point.trim() !== '').map((point, index) => (
+                  <li key={index} className="leading-relaxed">{point.trim()}</li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
+
+          {/* Specifications */}
+          {product.specifications && Object.keys(product.specifications).length > 0 && (
+            <div className="mt-8 border-t pt-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Specifications</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(product.specifications).map(([key, value]) => (
+                  <div key={key} className="flex justify-between py-3 border-b border-gray-200 last:border-b-0">
+                    <span className="font-medium text-gray-900">{key}</span>
+                    <span className="text-gray-700">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Reviews Section */}
           <div className="mt-10 border-t pt-8">

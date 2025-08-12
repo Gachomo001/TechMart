@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Upload, Trash2 } from 'lucide-react';
+import { Product } from '../../types';
 
 interface Category {
   id: string;
@@ -11,23 +12,6 @@ interface SubCategory {
   id: string;
   name: string;
   category_id: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  buying_price: number;
-  original_price: number | null;
-  brand: string | null;
-  category_id: string;
-  subcategory_id: string;
-  stock_quantity: number;
-  is_featured: boolean;
-  is_bestseller: boolean;
-  specifications: any;
-  product_images: { image_url: string }[];
 }
 
 interface AddProductModalProps {
@@ -44,14 +28,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
   productToEdit,
 }) => {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState<string | null>('');
   const [price, setPrice] = useState('');
   const [buyingPrice, setBuyingPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
-  const [brand, setBrand] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [subcategoryId, setSubcategoryId] = useState('');
-  const [stockQuantity, setStockQuantity] = useState('');
+  const [brand, setBrand] = useState<string>(''); // This is used in the form but not in the Product type
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [subcategoryId, setSubcategoryId] = useState<string>('');
+  const [stockQuantity, setStockQuantity] = useState<string>('');
   const [isFeatured, setIsFeatured] = useState(false);
   const [isBestseller, setIsBestseller] = useState(false);
   const [specifications] = useState<{ key: string; value: string }[]>([]);
@@ -66,17 +50,18 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
     fetchCategories();
     if (productToEdit) {
       setName(productToEdit.name);
-      setDescription(productToEdit.description);
+      setDescription(productToEdit.description || '');
       setPrice(productToEdit.price.toString());
       setBuyingPrice(productToEdit.buying_price.toString());
       setOriginalPrice(productToEdit.original_price?.toString() || '');
-      setBrand(productToEdit.brand || '');
-      setCategoryId(productToEdit.category_id);
-      setSubcategoryId(productToEdit.subcategory_id);
+      // brand is not part of the Product type, so we'll use an empty string as fallback
+      setBrand('');
+      setCategoryId(productToEdit.category_id || '');
+      setSubcategoryId(productToEdit.subcategory_id || '');
       setStockQuantity(productToEdit.stock_quantity.toString());
       setIsFeatured(productToEdit.is_featured);
       setIsBestseller(productToEdit.is_bestseller);
-      setExistingImages(productToEdit.product_images.map(img => ({ url: img.image_url, toDelete: false })));
+      setExistingImages((productToEdit.product_images || []).map(img => ({ url: img.image_url, toDelete: false })));
     } else {
       // Reset form when adding a new product
       setName('');
@@ -194,7 +179,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
       const productData = {
         name,
         slug,
-        description,
+        description: description || null, // Ensure null is used if description is empty string
         price: parseFloat(price),
         buying_price: parseFloat(buyingPrice),
         original_price: originalPrice ? parseFloat(originalPrice) : null,
@@ -281,8 +266,8 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
               <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={description || ''}
+                onChange={(e) => setDescription(e.target.value || null)}
                 rows={3}
                 className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-md text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />

@@ -9,8 +9,6 @@ import {
 import AddProductModal from '../../components/admin/AddProductModal';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 
-const LAPTOP_CATEGORY_ID = 'd387a180-23f0-4427-8b22-b076320fdfc6';
-
 interface Product {
   id: string;
   name: string;
@@ -40,12 +38,6 @@ interface Product {
 interface Category {
   id: string;
   name: string;
-}
-
-interface Subcategory {
-  id: string;
-  name: string;
-  category_id: string;
 }
 
 const Products: React.FC = () => {
@@ -302,8 +294,15 @@ const Products: React.FC = () => {
                         />
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                      {product.name}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="max-w-[200px] overflow-hidden">
+                        <span 
+                          className="text-sm font-medium text-white truncate block"
+                          title={product.name}
+                        >
+                          {product.name}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
                       KES {product.price.toLocaleString()}

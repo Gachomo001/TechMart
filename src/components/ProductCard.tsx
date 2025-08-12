@@ -94,8 +94,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onViewDetails }) => 
       <div className="p-4 sm:p-6">
         {/* Category and Stock Status */}
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs sm:text-sm text-gray-500 capitalize">{subcategory}</p>
-          <span className={`${stockStatus.color} text-white px-2 py-1 rounded-full text-xs font-semibold`}>
+          <p 
+            className="text-xs sm:text-sm text-gray-500 capitalize truncate pr-2"
+            title={window.innerWidth >= 768 ? subcategory : undefined}>
+            {subcategory}
+          </p>
+          <span className={`${stockStatus.color} text-white px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap`}>
             {stockStatus.text}
           </span>
         </div>

@@ -98,8 +98,11 @@ const CategoryNavigation: React.FC<CategoryNavigationProps> = ({
           </div>
         )}
       </div>
-      <span className={`text-xs font-medium text-center text-gray-700 group-hover:text-blue-600 
-        transition-colors w-full truncate px-1 ${isMobile ? 'text-xs' : 'text-[10px] sm:text-xs'}`}>
+      <span 
+        className={`text-xs font-medium text-center text-gray-700 group-hover:text-blue-600 
+        transition-colors w-full truncate px-1 ${isMobile ? 'text-xs' : 'text-[10px] sm:text-xs'}`}
+        title={!isMobile && window.innerWidth >= 768 ? category.name : undefined}
+      >
         {category.name}
       </span>
     </button>

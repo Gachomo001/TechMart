@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const PromotionBar: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState({
@@ -105,22 +106,22 @@ export const PromotionBar: React.FC = () => {
           
           {/* Shop Now CTA - Positioned on the right */}
           <div className="hidden lg:block">
-            <a 
-              href="/sale" 
+            <Link 
+              to="/deals" 
               className="px-4 py-1.5 bg-white text-red-600 rounded-full text-xs sm:text-sm font-semibold hover:bg-gray-100 transition-colors whitespace-nowrap"
             >
               Shop Now
-            </a>
+            </Link>
           </div>
           
           {/* Mobile Shop Now CTA - Only visible on mobile */}
           <div className="lg:hidden">
-            <a 
-              href="/sale" 
+            <Link 
+              to="/deals" 
               className="px-3 py-1 bg-white text-red-600 rounded-full text-xs font-semibold hover:bg-gray-100 transition-colors whitespace-nowrap"
             >
               Shop Now
-            </a>
+            </Link>
           </div>
         </div>
       </div>

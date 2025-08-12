@@ -1401,9 +1401,12 @@ const CheckoutPage: React.FC = () => {
                 {state.items.map((item) => (
                   <div key={item.product.id} className="flex gap-3">
                     <img
-                      src={item.product.image}
+                      src={item.product.image_url || 'https://via.placeholder.com/100'}
                       alt={item.product.name}
                       className="w-16 h-16 object-cover rounded-lg"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100';
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm truncate">

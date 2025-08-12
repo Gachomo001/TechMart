@@ -81,14 +81,6 @@ const Products: React.FC = () => {
 
       if (categoriesError) throw categoriesError;
 
-      // Fetch subcategories
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
-        .from('subcategories')
-        .select('*')
-        .order('name');
-
-      if (subcategoriesError) throw subcategoriesError;
-
       setProducts(productsData || []);
       setCategories(categoriesData || []);
     } catch (error) {

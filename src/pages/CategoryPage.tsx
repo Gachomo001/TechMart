@@ -343,7 +343,7 @@ const CategoryPage: React.FC<{ onSignInRequired?: () => void }> = ({ onSignInReq
         onViewDealsClick={() => navigate('/deals')}
       />
 
-      <main className="pt-16 lg:pt-2">
+      <main className="pt-16 lg:pt-2 pb-16">
         <div className="max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Filters Sidebar */}

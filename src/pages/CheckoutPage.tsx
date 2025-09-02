@@ -1,17 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { CreditCard, Shield, Check, Smartphone, Download } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
-import BackButton from '../components/BackButton';
-import CustomDropdown from '../components/CustomDropdown';
-import jsPDF from 'jspdf';
-import { UserOptions } from 'jspdf-autotable';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import pesapalService from '../lib/pesapal';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { UserOptions } from 'jspdf-autotable';
+import { CartItem } from '../../types';
+import { Check, Download } from 'lucide-react';
+import BackButton from '@/components/BackButton';
+import CustomDropdown from '@/components/CustomDropdown';
+import UnifiedPaymentForm from '@/components/Payment/UnifiedPaymentForm';
+import OrderSummaryCard from '@/components/checkout/OrderSummaryCard';
 
-// Add type augmentation for jsPDF
 declare module 'jspdf' {
   interface jsPDF {
     lastAutoTable: {
@@ -32,954 +34,506 @@ interface ShippingInfo {
   shippingType: string;
 }
 
-interface PaymentInfo {
-  cardNumber: string;
-  expiryDate: string;
-  cvv: string;
-  nameOnCard: string;
-  billingAddress: string;
-  billingCity: string;
-  billingState: string;
-  billingZipCode: string;
-  sameAsShipping: boolean;
+interface ValidationErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  county?: string;
+  region?: string;
+  shippingType?: string;
 }
 
-interface MpesaInfo {
-  phoneNumber: string;
+interface RegionDetails {
+  delivery_status: 'paid' | 'free' | null;
+  delivery_costs: {
+    standard_delivery_cost: number;
+    express_delivery_cost: number;
+    heavy_items_cost: number;
+    bulky_items_cost: number;
+  } | null;
 }
 
 const CheckoutPage: React.FC = () => {
+  const { state, getTotalPrice } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { state, getTotalPrice, clearCart } = useCart();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [orderComplete, setOrderComplete] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mpesa'>('mpesa');
-  const [mpesaPromptSent, setMpesaPromptSent] = useState(false);
-  const [orderNumber, setOrderNumber] = useState('');
-  const [orderItems, setOrderItems] = useState<any[]>([]);
-  const [orderTotals, setOrderTotals] = useState({
-    subtotal: 0,
-    tax: 0,
-    shippingCost: 0,
-    total: 0
-  });
-  
-  // Ref for the order confirmed modal
-  const orderConfirmedModalRef = useRef<HTMLDivElement>(null);
 
-  // Store the previous path
-  const [previousPath, setPreviousPath] = useState('/');
+  const [currentStep, setCurrentStep] = useState(1);
+  const [orderComplete] = useState(false);
+  const [orderNumber] = useState('');
+  const [orderItems] = useState<CartItem[]>([]);
 
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
+    firstName: user?.user_metadata.full_name?.split(' ')[0] || '',
+    lastName: user?.user_metadata.full_name?.split(' ')[1] || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
     county: '',
     region: '',
     country: 'Kenya',
-    shippingType: ''
+    shippingType: '',
   });
 
-  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>({
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    nameOnCard: '',
-    billingAddress: '',
-    billingCity: '',
-    billingState: '',
-    billingZipCode: '',
-    sameAsShipping: true
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+
+  const [paymentState] = useState({
+    processing: false,
+    error: null as string | null,
   });
 
-  const [mpesaInfo, setMpesaInfo] = useState<MpesaInfo>({
-    phoneNumber: ''
-  });
+  // Auth guard: require authentication before accessing checkout
+  useEffect(() => {
+    if (!user) {
+      toast.error('Please sign in to continue to checkout.');
+      navigate('/auth', { replace: true, state: { from: '/checkout' } });
+    }
+  }, [user, navigate]);
 
-  const { user } = useAuth();
+  // Store cleanup functions
+  const cleanupFunctions = React.useRef<Array<() => void>>([]);
 
-  // State for storing locations
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      cleanupFunctions.current.forEach(cleanup => {
+        try {
+          cleanup();
+        } catch (e) {
+          console.error('Error during cleanup:', e);
+        }
+      });
+      cleanupFunctions.current = [];
+    };
+  }, []);
+
   const [counties, setCounties] = useState<{ value: string; label: string }[]>([]);
   const [regions, setRegions] = useState<{ value: string; label: string }[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [selectedRegionDetails, setSelectedRegionDetails] = useState<RegionDetails | null>(null);
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
 
-  // Scroll to top when component mounts
+  const shippingCost = useMemo(() => {
+    if (selectedRegionDetails?.delivery_status === 'free') return 0;
+    const selectedOption = shippingOptions.find(opt => opt.id === shippingInfo.shippingType);
+    return selectedOption?.price || 0;
+  }, [shippingOptions, shippingInfo.shippingType, selectedRegionDetails]);
+
+  const orderTotals = useMemo(() => {
+    const subtotal = getTotalPrice();
+    const tax = subtotal * 0.16; // Tax is 16% of subtotal
+    const total = subtotal + shippingCost;
+    return { subtotal, tax, shippingCost, total };
+  }, [getTotalPrice, shippingCost]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [currentStep, orderComplete]);
 
-  // Add after other useState declarations
-  const [selectedRegionDetails, setSelectedRegionDetails] = useState<{
-    delivery_status: 'paid' | 'free' | null;
-    delivery_costs: {
-      standard_delivery_cost: number;
-      express_delivery_cost: number;
-      heavy_items_cost: number;
-      bulky_items_cost: number;
-    } | null;
-  } | null>(null);
-
-  // Add these derived variables after counties/regions state
-  const selectedCountyName = counties.find(c => c.value === shippingInfo.county)?.label || shippingInfo.county;
-  const selectedRegionName = regions.find(r => r.value === shippingInfo.region)?.label || shippingInfo.region;
-
-  // Fetch counties from the database
-  useEffect(() => {
-    const fetchCounties = async () => {
-      try {
-        setIsLoadingLocations(true);
-        const { data, error } = await supabase
-          .from('locations')
-          .select('id, name')
-          .eq('type', 'county')
-          .eq('is_active', true)
-          .order('name');
-
-        if (error) throw error;
-
-        const formattedCounties = data.map(county => ({
-          value: county.id,
-          label: county.name
-        }));
-
-        setCounties(formattedCounties);
-      } catch (error) {
-        console.error('Error fetching counties:', error);
-      } finally {
-        setIsLoadingLocations(false);
-      }
-    };
-
-    fetchCounties();
-  }, []);
-
-  // Fetch regions when county changes
-  useEffect(() => {
-    const fetchRegions = async () => {
-      if (!shippingInfo.county) {
-        setRegions([]);
-        return;
-      }
-
-      try {
-        setIsLoadingLocations(true);
-        const { data, error } = await supabase
-          .from('locations')
-          .select('id, name')
-          .eq('type', 'region')
-          .eq('parent_id', shippingInfo.county)
-          .eq('is_active', true)
-          .order('name');
-
-        if (error) throw error;
-
-        const formattedRegions = data.map(region => ({
-          value: region.id,
-          label: region.name
-        }));
-
-        setRegions(formattedRegions);
-      } catch (error) {
-        console.error('Error fetching regions:', error);
-      } finally {
-        setIsLoadingLocations(false);
-      }
-    };
-
-    fetchRegions();
-  }, [shippingInfo.county]);
-
-  // Fetch region delivery_status and delivery_costs when region changes
-  useEffect(() => {
-    const fetchRegionDetails = async () => {
-      if (!shippingInfo.region) {
-        setSelectedRegionDetails(null);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('locations')
-        .select(`
-          delivery_status,
-          delivery_costs(
-            standard_delivery_cost,
-            express_delivery_cost,
-            heavy_items_cost,
-            bulky_items_cost
-          )
-        `)
-        .eq('id', shippingInfo.region)
-        .single();
-
-      if (error) {
-        setSelectedRegionDetails(null);
-        return;
-      }
-      setSelectedRegionDetails({
-        delivery_status: data.delivery_status,
-        delivery_costs: Array.isArray(data.delivery_costs) ? data.delivery_costs[0] : data.delivery_costs
-      });
-    };
-    fetchRegionDetails();
-  }, [shippingInfo.region]);
-
-  // Dynamic shipping options based on selected region's delivery_costs
-  const shippingOptions = selectedRegionDetails?.delivery_costs
-    ? [
-        {
-          id: 'standard',
-          name: 'Standard Delivery',
-          description: 'For items under 5kg (electronics, clothing, small accessories)',
-          price: selectedRegionDetails.delivery_costs.standard_delivery_cost,
-          duration: '5-7 business days'
-        },
-        {
-          id: 'express',
-          name: 'Express Delivery',
-          description: 'For items 5-15kg (medium electronics, small appliances)',
-          price: selectedRegionDetails.delivery_costs.express_delivery_cost,
-          duration: '2-3 business days'
-        },
-        {
-          id: 'heavy',
-          name: 'Heavy Items Delivery',
-          description: 'For items 15-30kg (large appliances, furniture)',
-          price: selectedRegionDetails.delivery_costs.heavy_items_cost,
-          duration: '3-4 business days'
-        },
-        {
-          id: 'bulky',
-          name: 'Bulky Items Delivery',
-          description: 'For items over 30kg (large furniture, multiple items)',
-          price: selectedRegionDetails.delivery_costs.bulky_items_cost,
-          duration: '4-5 business days'
-        }
-      ]
-    : [];
-
-  // Reset region when county changes
-  useEffect(() => {
-    setShippingInfo(prev => ({ ...prev, region: '' }));
-  }, [shippingInfo.county]);
-
-  // Get the previous path when component mounts
-  useEffect(() => {
-    if (location.state?.from) {
-      setPreviousPath(location.state.from);
-    }
-  }, [location.state]);
-
-  // Redirect if cart is empty
   useEffect(() => {
     if (state.items.length === 0 && !orderComplete) {
+      toast.error('Your cart is empty. Redirecting to home page.');
       navigate('/');
     }
   }, [state.items.length, orderComplete, navigate]);
 
-  // Update shipping cost calculation
-  const getShippingCost = () => {
-    const selectedOption = shippingOptions.find(opt => opt.id === shippingInfo.shippingType);
-    return selectedOption?.price || 0;
-  };
+  useEffect(() => {
+    const fetchCounties = async () => {
+      setIsLoadingLocations(true);
+      try {
+        const { data, error } = await supabase.from('locations').select('id, name').eq('type', 'county');
+        if (error) throw error;
+        setCounties(data.map(loc => ({ value: loc.id, label: loc.name })));
+      } catch (error) {
+        console.error('Error fetching counties:', error);
+        toast.error('Could not load counties.');
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+    fetchCounties();
+  }, []);
 
-  // Add logging for initial calculations
-  const subtotal = getTotalPrice();
-  const tax = subtotal * 0.16; // 16% VAT (already included in product prices)
-  const shippingCost = getShippingCost();
-  const total = subtotal + shippingCost; // Total without adding VAT since it's already included
-  
-  console.log('[Debug] Initial calculations:', {
-    subtotal,
-    tax,
-    shippingCost,
-    total,
-    rawSubtotal: getTotalPrice()
-  });
+  useEffect(() => {
+    if (shippingInfo.county) {
+      const fetchRegions = async () => {
+        setIsLoadingLocations(true);
+        try {
+          const { data, error } = await supabase
+            .from('locations')
+            .select('id, name')
+            .eq('parent_id', shippingInfo.county)
+            .eq('type', 'region');
 
-  const handleShippingSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentStep(2);
-    // Scroll to top of the page when proceeding to payment
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+          if (error) throw error;
 
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isShippingInfoValid()) return;
-    
-    setIsProcessing(true);
-    try {
-      const newOrderNumber = generateOrderNumber();
-      
-      // Prepare order data
-      const orderData = {
-        order_number: newOrderNumber,
-        status: 'pending',
-        payment_status: 'pending',
-        payment_method: 'card',
-        payment_details: {
-          cardLast4: paymentInfo.cardNumber.slice(-4),
-          cardHolder: paymentInfo.nameOnCard
-        },
-        total_amount: total,
-        shipping_cost: shippingCost,
-        tax_amount: tax,
-        subtotal: subtotal,
-        shipping_type: shippingInfo.shippingType,
-        shipping_info: {
-          ...shippingInfo,
-          countyName: selectedCountyName,
-          regionName: selectedRegionName
-        },
-        email: shippingInfo.email,
-        phone: shippingInfo.phone,
-        user_id: user?.id
+          setRegions(
+            data.map((region) => ({
+              value: region.id,
+              label: region.name,
+            }))
+          );
+        } catch (error) {
+          console.error('Error fetching regions:', error);
+          toast.error('Failed to load regions');
+        } finally {
+          setIsLoadingLocations(false);
+        }
       };
 
-      // Insert order first
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Insert order items
-      const orderItems = state.items.map(item => ({
-        order_id: order.id,
-        product_id: item.product.id,
-        quantity: item.quantity,
-        price_at_time: item.product.price
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Initiate Pesapal card payment
-      const paymentResponse = await pesapalService.initiateCardPayment({
-        amount: total,
-        orderNumber: newOrderNumber,
-        customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
-        customerEmail: shippingInfo.email,
-        customerPhone: shippingInfo.phone,
-        description: `Payment for TechMart order ${newOrderNumber}`,
-        cardNumber: paymentInfo.cardNumber,
-        expiryMonth: paymentInfo.expiryDate.split('/')[0],
-        expiryYear: `20${paymentInfo.expiryDate.split('/')[1]}`,
-        cvv: paymentInfo.cvv,
-        cardHolderName: paymentInfo.nameOnCard
-      });
-
-      if (paymentResponse.success && paymentResponse.checkoutUrl) {
-        // Redirect to Pesapal checkout
-        window.location.href = paymentResponse.checkoutUrl;
-      } else {
-        throw new Error(paymentResponse.message || 'Failed to initiate payment');
-      }
-
-    } catch (error: any) {
-      console.error('Error processing card payment:', error);
-      toast.error(error.message || 'Payment failed. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleMpesaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isShippingInfoValid()) return;
-    
-    setIsProcessing(true);
-    try {
-      const newOrderNumber = generateOrderNumber();
-      
-      // Prepare order data
-      const orderData = {
-        order_number: newOrderNumber,
-        status: 'pending',
-        payment_status: 'pending',
-        payment_method: 'mpesa',
-        payment_details: {
-          phoneNumber: mpesaInfo.phoneNumber
-        },
-        total_amount: total,
-        shipping_cost: shippingCost,
-        tax_amount: tax,
-        subtotal: subtotal,
-        shipping_type: shippingInfo.shippingType,
-        shipping_info: {
-          ...shippingInfo,
-          countyName: selectedCountyName,
-          regionName: selectedRegionName
-        },
-        email: shippingInfo.email,
-        phone: shippingInfo.phone,
-        user_id: user?.id
-      };
-
-      // Insert order first
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Insert order items
-      const orderItems = state.items.map(item => ({
-        order_id: order.id,
-        product_id: item.product.id,
-        quantity: item.quantity,
-        price_at_time: item.product.price
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Initiate Pesapal M-Pesa payment
-      const paymentResponse = await pesapalService.initiateMpesaPayment({
-        amount: total,
-        phoneNumber: mpesaInfo.phoneNumber,
-        orderNumber: newOrderNumber,
-        customerName: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
-        customerEmail: shippingInfo.email,
-        customerPhone: shippingInfo.phone,
-        description: `Payment for TechMart order ${newOrderNumber}`
-      });
-
-      if (paymentResponse.success && paymentResponse.checkoutUrl) {
-        // Redirect to Pesapal checkout
-        window.location.href = paymentResponse.checkoutUrl;
-      } else {
-        throw new Error(paymentResponse.message || 'Failed to initiate payment');
-      }
-
-    } catch (error: any) {
-      console.error('Error processing M-Pesa payment:', error);
-      toast.error(error.message || 'Payment failed. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleContinueShopping = () => {
-    navigate('/');
-  };
-
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
+      fetchRegions();
     } else {
-      return v;
+      setRegions([]);
+      setShippingInfo((prev) => ({ ...prev, region: '' }));
+    }
+  }, [shippingInfo.county]);
+
+  useEffect(() => {
+    const fetchShippingCosts = async () => {
+      if (!shippingInfo.region) {
+        setShippingOptions([]);
+        setSelectedRegionDetails(null);
+        setShippingInfo(prev => ({ ...prev, shippingType: '' }));
+        return;
+      }
+
+      const toastId = toast.loading('Fetching shipping options...');
+      try {
+        const {
+          data: deliveryCostsData,
+          error: deliveryCostsError,
+        } = await supabase
+          .from('delivery_costs')
+          .select('standard_delivery_cost, express_delivery_cost, heavy_items_cost, bulky_items_cost')
+          .eq('location_id', shippingInfo.region)
+          .single();
+
+        const { data: locationData, error: locationError } = await supabase
+          .from('locations')
+          .select('delivery_status')
+          .eq('id', shippingInfo.region)
+          .single();
+
+
+        if (deliveryCostsError || locationError) {
+          throw new Error(deliveryCostsError?.message || locationError?.message);
+        }
+
+        const correctedDetails: RegionDetails = {
+          delivery_status: locationData?.delivery_status || null,
+          delivery_costs: deliveryCostsData,
+        };
+
+        setSelectedRegionDetails(correctedDetails);
+
+        if (correctedDetails.delivery_status === 'free') {
+          setShippingOptions([]);
+          setShippingInfo(prev => ({ ...prev, shippingType: 'free' }));
+          toast.success('Free shipping available!', { id: toastId });
+        } else if (correctedDetails.delivery_costs) {
+          const costs = correctedDetails.delivery_costs;
+          const options = [
+            { 
+              id: 'standard', 
+              name: 'Standard Delivery', 
+              description: 'For items under 5kg (electronics, small accessories)', 
+              price: costs.standard_delivery_cost,
+              icon: '🚚' 
+            },
+            { 
+              id: 'express', 
+              name: 'Express Delivery', 
+              description: 'For items 5-15kg (medium electronics, small appliances)', 
+              price: costs.express_delivery_cost,
+              icon: '⚡' 
+            },
+            { 
+              id: 'heavy', 
+              name: 'Heavy Items', 
+              description: 'For items 15-30kg (large appliances, Standard PC Builds)', 
+              price: costs.heavy_items_cost,
+              icon: '🏋️' 
+            },
+            { 
+              id: 'bulky', 
+              name: 'Bulky Items', 
+              description: 'For items over 30kg (large PC Builds, multiple items)', 
+              price: costs.bulky_items_cost,
+              icon: '📦' 
+            },
+          ].filter(option => option.price > 0); // Only show options with a price > 0
+          
+          setShippingOptions(options);
+          setShippingInfo(prev => ({ 
+            ...prev, 
+            shippingType: options.length > 0 ? options[0].id : '' 
+          }));
+          
+          if (options.length > 0) {
+            toast.success('Shipping options updated.', { id: toastId });
+          } else {
+            toast.error('No valid shipping options found for this location.', { id: toastId });
+          }
+        } else {
+          setShippingOptions([]);
+          toast.error('No shipping options found.', { id: toastId });
+        }
+      } catch (err) {
+        console.error('Error fetching shipping costs:', err);
+        toast.error('Could not load shipping options.', { id: toastId });
+      }
+    };
+
+    fetchShippingCosts();
+  }, [shippingInfo.region]);
+
+  const formatPhoneNumber = (value: string): string => {
+    const numbers = value.replace(/[^0-9]/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6, 9)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleanNumber = e.target.value.replace(/[^\d]/g, '');
+    if (cleanNumber.length <= 9) {
+      setShippingInfo(prev => ({
+        ...prev,
+        phone: cleanNumber
+      }));
     }
   };
 
-  const formatPhoneNumber = (value: string) => {
-    // Remove any non-digit characters except the + prefix
-    const v = value.replace(/[^\d+]/g, '');
-    
-    // If the input starts with +254, remove it for processing
-    const cleanNumber = v.startsWith('+254') ? v.slice(4) : v;
-    
-    // Format the number with +254 prefix
-    if (cleanNumber.length <= 3) return `+254${cleanNumber}`;
-    if (cleanNumber.length <= 6) return `+254${cleanNumber.slice(0, 3)}-${cleanNumber.slice(3)}`;
-    if (cleanNumber.length <= 9) return `+254${cleanNumber.slice(0, 3)}-${cleanNumber.slice(3, 6)}-${cleanNumber.slice(6)}`;
-    return `+254${cleanNumber.slice(0, 3)}-${cleanNumber.slice(3, 6)}-${cleanNumber.slice(6, 9)}`;
+  const handlePhoneBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^\d]/g, '');
+    if (value.length > 0) {
+      const formatted = formatPhoneNumber(value);
+      setShippingInfo(prev => ({
+        ...prev,
+        phone: formatted
+      }));
+    }
   };
 
-  const handleBackToStore = () => {
-    navigate(previousPath);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setShippingInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const fetchShippingCosts = async (regionId: string) => {
+    if (!regionId) {
+      setShippingOptions([]);
+      setSelectedRegionDetails(null);
+      setShippingInfo(prev => ({ ...prev, shippingType: '' }));
+      return;
+    }
+
+    const toastId = toast.loading('Fetching shipping options...');
+    try {
+      const { data, error } = await supabase
+        .from('delivery_costs')
+        .select('standard_delivery_cost, express_delivery_cost, heavy_items_cost, bulky_items_cost')
+        .eq('location_id', regionId)
+        .single();
+
+      const { data: locationData, error: locationError } = await supabase
+        .from('locations')
+        .select('delivery_status')
+        .eq('id', regionId)
+        .single()
+
+
+      if (error || locationError) {
+        throw new Error(error?.message || locationError?.message);
+      }
+
+      const correctedDetails: RegionDetails = {
+        delivery_status: locationData?.delivery_status || null,
+        delivery_costs: data,
+      };
+
+      setSelectedRegionDetails(correctedDetails);
+
+      if (correctedDetails.delivery_status === 'free') {
+        setShippingOptions([]);
+        setShippingInfo(prev => ({ ...prev, shippingType: 'free' }));
+        toast.success('Free shipping available!', { id: toastId });
+      } else if (correctedDetails.delivery_costs) {
+        const costs = correctedDetails.delivery_costs;
+        const options = [
+          { 
+            id: 'standard', 
+            name: 'Standard Delivery', 
+            description: 'For items under 5kg (electronics, small accessories)', 
+            price: costs.standard_delivery_cost,
+            icon: '🚚' 
+          },
+          { 
+            id: 'express', 
+            name: 'Express Delivery', 
+            description: 'For items 5-15kg (medium electronics, small appliances)', 
+            price: costs.express_delivery_cost,
+            icon: '⚡' 
+          },
+          { 
+            id: 'heavy', 
+            name: 'Heavy Items', 
+            description: 'For items 15-30kg (large appliances, Standard PC Builds)', 
+            price: costs.heavy_items_cost,
+            icon: '🏋️' 
+          },
+          { 
+            id: 'bulky', 
+            name: 'Bulky Items', 
+            description: 'For items over 30kg (large PC Builds, multiple items)', 
+            price: costs.bulky_items_cost,
+            icon: '📦' 
+          },
+        ].filter(option => option.price > 0);
+        
+        setShippingOptions(options);
+        const newShippingType = options.length > 0 ? options[0].id : '';
+        setShippingInfo(prev => ({ ...prev, shippingType: newShippingType }));
+        
+        if (options.length > 0) {
+          toast.success('Shipping options updated.', { id: toastId });
+        } else {
+          toast.error('No shipping options available for this region.', { id: toastId });
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching shipping costs:', err);
+      toast.error(err.message || 'Failed to load shipping options', { id: toastId });
+      setShippingOptions([]);
+      setSelectedRegionDetails(null);
+      setShippingInfo(prev => ({ ...prev, shippingType: '' }));
+    }
+  };
+
+  const handleDropdownChange = async (name: string, value: string) => {
+    const updatedInfo = { ...shippingInfo, [name]: value };
+    setShippingInfo(updatedInfo);
+    
+    // If region is being changed, trigger shipping cost fetch
+    if (name === 'region' && value) {
+      await fetchShippingCosts(value);
+    }
+  };
+
+  const validateShippingInfo = () => {
+    const errors: ValidationErrors = {};
+    
+    if (!shippingInfo.firstName.trim()) {
+      errors.firstName = 'First name is required';
+    }
+    
+    if (!shippingInfo.lastName.trim()) {
+      errors.lastName = 'Last name is required';
+    }
+    
+    if (!shippingInfo.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(shippingInfo.email)) {
+      errors.email = 'Invalid email address';
+    }
+    
+    if (!shippingInfo.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (!/^\d{3}-\d{3}-\d{3}$/.test(shippingInfo.phone)) {
+      errors.phone = 'Invalid phone number format (use XXX-XXX-XXX)';
+    }
+    
+    if (!shippingInfo.county) {
+      errors.county = 'County is required';
+    }
+    
+    if (!shippingInfo.region) {
+      errors.region = 'Region is required';
+    }
+    
+    if (selectedRegionDetails?.delivery_status !== 'free' && !shippingInfo.shippingType) {
+      errors.shippingType = 'Shipping type is required';
+    }
+    
+    return errors;
   };
 
   const isShippingInfoValid = () => {
-    const isBaseValid =
-      shippingInfo.firstName.trim() !== '' &&
-      shippingInfo.lastName.trim() !== '' &&
-      shippingInfo.phone.trim() !== '' &&
-      shippingInfo.county.trim() !== '' &&
-      shippingInfo.region.trim() !== '';
-
-    if (selectedRegionDetails?.delivery_status === 'free') {
-      return isBaseValid;
-    }
-    // For paid, require shippingType
-    return isBaseValid && shippingInfo.shippingType.trim() !== '';
+    const errors = validateShippingInfo();
+    return Object.keys(errors).length === 0;
   };
 
-  const handleStepClick = (step: number) => {
-    if (step === 2 && !isShippingInfoValid()) {
-      return; // Don't allow navigation to payment if shipping info is incomplete
-    }
-    if (step < currentStep) {
-      setCurrentStep(step);
+  const handleShippingSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors = validateShippingInfo();
+    setValidationErrors(errors);
+    
+    if (Object.keys(errors).length === 0) {
+      setCurrentStep(2);
+    } else {
+      toast.error('Please fix the validation errors before continuing.');
     }
   };
 
-  const handleDownloadReceipt = async () => {
-    console.log('[Debug] Download Receipt button clicked');
-    console.log('[Debug] Current values:', orderTotals);
+  const handleUnifiedPaymentComplete = async (response: any) => {
+    console.log('[CheckoutPage] Unified payment completed:', response);
     
     try {
-      const orderData = {
-        order_number: orderNumber,
-        payment_method: paymentMethod,
-        shipping_info: {
-          ...shippingInfo,
-          countyName: selectedCountyName,
-          regionName: selectedRegionName
-        },
-        items: orderItems,
-        subtotal: orderTotals.subtotal,
-        shipping_cost: orderTotals.shippingCost,
-        tax_amount: orderTotals.tax,
-        total_amount: orderTotals.total,
-        shipping_type: shippingInfo.shippingType
-      };
-      console.log('[Debug] Order data for PDF:', orderData);
-      
-      const doc = await generateReceiptPDF(orderData);
-      console.log('[Debug] PDF generated, attempting to save');
-      
-      // Save the PDF
-      doc.save(`TechMart_Receipt_${orderNumber}.pdf`);
-      console.log('[Debug] PDF saved successfully');
+      console.log('[CheckoutPage] Payment completion handled by UnifiedPaymentForm');
     } catch (error) {
-      console.error('[Debug] Error in handleDownloadReceipt:', error);
-      alert('Failed to download receipt. Please try again.');
+      console.error('[CheckoutPage] Error in payment completion:', error);
     }
   };
 
-  const generateReceiptPDF = async (orderData: any) => {
-    console.log('[Debug] Starting PDF generation with order data:', {
-      orderNumber: orderData.order_number,
-      subtotal: orderData.subtotal,
-      tax: orderData.tax_amount,
-      shipping: orderData.shipping_cost,
-      total: orderData.total_amount,
-      items: orderData.items?.length
-    });
-    
-    if (!orderData || !orderData.items) {
-      console.error('[Debug] Invalid order data:', orderData);
-      throw new Error('Invalid order data: items are missing');
-    }
-    
+  const handleDownloadReceipt = () => {
+    const toastId = toast.loading('Generating receipt...');
     try {
-      // Create new jsPDF instance with larger page size for better quality
-      const doc = new jsPDF({
-        unit: 'px',
-        format: [595.28, 841.89], // A4 size in pixels
-        orientation: 'portrait'
+      const doc = new jsPDF();
+      doc.text('TechMart Receipt', 20, 20);
+      doc.text(`Order Number: ${orderNumber}`, 20, 30);
+      doc.autoTable({
+        startY: 40,
+        head: [['Item', 'Quantity', 'Price', 'Total']],
+        body: orderItems.map(item => [
+          item.product.name,
+          item.quantity,
+          `KES ${item.product.price.toFixed(2)}`,
+          `KES ${(item.product.price * item.quantity).toFixed(2)}`,
+        ]),
       });
-
-      // Set default font
-      doc.setFont('helvetica');
-      
-      // Add card-like background and border
-      const margin = 40;
-      const cardWidth = 595.28 - (margin * 2);
-      const cardHeight = 841.89 - (margin * 2);
-      const cornerRadius = 12; // Radius for rounded corners
-      
-      // Add white background
-      doc.setFillColor(255, 255, 255);
-      doc.rect(margin, margin, cardWidth, cardHeight, 'F');
-      
-      // Draw rounded corners (simulated with multiple lines)
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(2); // Make the border bolder
-      
-      // Draw the main rectangle
-      doc.rect(margin, margin, cardWidth, cardHeight);
-      
-      // Draw rounded corners by drawing multiple lines
-      // Top-left corner
-      doc.line(margin + cornerRadius, margin, margin, margin);
-      doc.line(margin, margin, margin, margin + cornerRadius);
-      
-      // Top-right corner
-      doc.line(cardWidth + margin - cornerRadius, margin, cardWidth + margin, margin);
-      doc.line(cardWidth + margin, margin, cardWidth + margin, margin + cornerRadius);
-      
-      // Bottom-left corner
-      doc.line(margin + cornerRadius, cardHeight + margin, margin, cardHeight + margin);
-      doc.line(margin, cardHeight + margin, margin, cardHeight + margin - cornerRadius);
-      
-      // Bottom-right corner
-      doc.line(cardWidth + margin - cornerRadius, cardHeight + margin, cardWidth + margin, cardHeight + margin);
-      doc.line(cardWidth + margin, cardHeight + margin, cardWidth + margin, cardHeight + margin - cornerRadius);
-
-      // Add TechMart title with gradient effect (simulated with blue color)
-      doc.setFontSize(38);
-      doc.setTextColor(59, 130, 246);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TechMart', 297.64, margin + 40, { align: 'center' });
-      
-      // Add "Order Receipt" subtitle
-      doc.setFontSize(16);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Order Receipt', 297.64, margin + 60, { align: 'center' });
-
-      // Add order details section
-      let currentY = margin + 100;
-      
-      // Order details grid
-      doc.setFontSize(14);
-      doc.setTextColor(71, 85, 105); // slate-600
-      
-      // Left column
-      doc.text('Order Number:', margin + 20, currentY);
-      doc.setFontSize(16);
-      doc.setTextColor(37, 99, 235); // blue-600
-      doc.setFont('helvetica', 'bold');
-      doc.text(`#${orderData.order_number}`, margin + 20, currentY + 20);
-      
-      // Right column
-      doc.setFontSize(14);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.setFont('helvetica', 'normal');
-      doc.text('Order Date:', cardWidth + margin - 20, currentY, { align: 'right' });
-      doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont('helvetica', 'bold');
-      doc.text(new Date().toLocaleDateString(), cardWidth + margin - 20, currentY + 20, { align: 'right' });
-      
-      currentY += 40;
-      
-      // Payment Method and Status
-      doc.setFontSize(14);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.setFont('helvetica', 'normal');
-      doc.text('Payment Method:', margin + 20, currentY);
-      doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont('helvetica', 'bold');
-      
-      // Format payment method text with proper M-Pesa number display
-      const paymentMethodText = orderData.payment_method === 'card' 
-        ? `Card ending in ${orderData.payment_details?.cardLast4 || '****'}` 
-        : `M-Pesa (${orderData.payment_details?.phoneNumber || mpesaInfo?.phoneNumber || ''})`;
-      
-      doc.text(paymentMethodText, margin + 20, currentY + 20);
-      
-      // Status
-      doc.setFontSize(14);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.setFont('helvetica', 'normal');
-      doc.text('Status:', cardWidth + margin - 20, currentY, { align: 'right' });
-      doc.setFontSize(16);
-      doc.setTextColor(22, 163, 74); // green-600
-      doc.setFont('helvetica', 'bold');
-      doc.text('Confirmed', cardWidth + margin - 20, currentY + 20, { align: 'right' });
-
-      // Add more space before the separator line
-      currentY += 50;
-      
-      // Add separator line before Items Ordered section
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(1);
-      doc.line(margin + 20, currentY, cardWidth + margin - 20, currentY);
-      currentY += 30;
-
-      // Add items section
-      doc.setFontSize(18);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont('helvetica', 'bold');
-      doc.text('Items Ordered', margin + 20, currentY);
-      currentY += 30;
-
-      // Process each item
-      for (const item of orderData.items) {
-        if (currentY > 700) { // Check if we need a new page
-          doc.addPage();
-          currentY = margin + 40;
-        }
-
-        try {
-          // Load and add product image
-          const img = new Image();
-          img.src = item.product.image;
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-          });
-
-          // Add image (48x48 pixels)
-          doc.addImage(img, 'JPEG', margin + 20, currentY, 48, 48, undefined, 'FAST');
-          
-          // Add product details
-          doc.setFontSize(16);
-          doc.setTextColor(15, 23, 42); // slate-900
-          doc.setFont('helvetica', 'bold');
-          doc.text(item.product.name, margin + 80, currentY + 20);
-          
-          doc.setFontSize(14);
-          doc.setTextColor(71, 85, 105); // slate-600
-          doc.setFont('helvetica', 'normal');
-          doc.text(`Qty: ${item.quantity} × KES ${item.product.price.toLocaleString()}`, margin + 80, currentY + 40);
-          
-          // Add total price
-          doc.setFontSize(18);
-          doc.setTextColor(15, 23, 42); // slate-900
-          doc.setFont('helvetica', 'bold');
-          doc.text(
-            `KES ${(item.product.price * item.quantity).toLocaleString()}`,
-            cardWidth + margin - 20,
-            currentY + 30,
-            { align: 'right' }
-          );
-
-          currentY += 80; // Add spacing between items
-        } catch (error) {
-          console.error('[Debug] Error processing item image:', error);
-          currentY += 80;
-        }
-      }
-
-      // Add totals section (without background)
-      currentY += 20;
-      doc.setFontSize(14);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.setFont('helvetica', 'normal');
-      let y = currentY;
-
-      // Subtotal
-      doc.text('Subtotal (incl. VAT):', margin + 20, y);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`KES ${orderData.subtotal.toLocaleString()}`, cardWidth + margin - 20, y, { align: 'right' });
-      y += 25;
-
-      // VAT
-      doc.setFont('helvetica', 'normal');
-      doc.text('VAT (16%):', margin + 20, y);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`KES ${orderData.tax_amount.toLocaleString()}`, cardWidth + margin - 20, y, { align: 'right' });
-      y += 25;
-
-      // Shipping
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Shipping (${orderData.shipping_type}):`, margin + 20, y);
-      doc.setFont('helvetica', 'bold');
-      doc.text(
-        orderData.shipping_cost === 0 
-          ? 'FREE' 
-          : `KES ${orderData.shipping_cost.toLocaleString()}`,
-        cardWidth + margin - 20,
-        y,
-        { align: 'right' }
-      );
-      y += 40;
-
-      // Total Amount
-      doc.setFontSize(20);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont('helvetica', 'bold');
-      doc.text('Total Amount:', margin + 20, y);
-      doc.setTextColor(22, 163, 74); // green-600
-      doc.text(`KES ${orderData.total_amount.toLocaleString()}`, cardWidth + margin - 20, y, { align: 'right' });
-
-      // Add shipping information
-      currentY = y + 30; // Adjust spacing after totals section
-      if (currentY > 700) {
-        doc.addPage();
-        currentY = margin + 40;
-      }
-
-      // Add a separator line after totals
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(1);
-      doc.line(margin + 20, currentY, cardWidth + margin - 20, currentY);
-      currentY += 30;
-
-      doc.setFontSize(18);
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont('helvetica', 'bold');
-      doc.text('Shipping Information', margin + 20, currentY);
-      currentY += 30;
-
-      doc.setFontSize(14);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.setFont('helvetica', 'normal');
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${orderData.shipping_info.firstName} ${orderData.shipping_info.lastName}`, margin + 20, currentY);
-      currentY += 20;
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${orderData.shipping_info.countyName || orderData.shipping_info.county}, ${orderData.shipping_info.regionName || orderData.shipping_info.region}`, margin + 20, currentY);
-      currentY += 20;
-      doc.text(orderData.shipping_info.country, margin + 20, currentY);
-      currentY += 20;
-      if (orderData.shipping_info.email) {
-        doc.setTextColor(37, 99, 235); // blue-600
-        doc.text(orderData.shipping_info.email, margin + 20, currentY);
-        currentY += 20;
-      }
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.text(orderData.shipping_info.phone, margin + 20, currentY);
-
-      console.log('[Debug] PDF generation completed');
-      return doc;
+      const finalY = doc.lastAutoTable.finalY;
+      doc.text(`Subtotal: KES ${orderTotals.subtotal.toFixed(2)}`, 20, finalY + 10);
+      doc.text(`Shipping: KES ${orderTotals.shippingCost.toFixed(2)}`, 20, finalY + 20);
+      doc.text(`Total: KES ${orderTotals.total.toFixed(2)}`, 20, finalY + 30);
+      doc.save(`TechMart_Receipt_${orderNumber}.pdf`);
+      toast.success('Receipt downloaded!', { id: toastId });
     } catch (error) {
-      console.error('[Debug] Error generating PDF:', error);
-      throw error;
+      console.error('Error generating receipt:', error);
+      toast.error('Failed to download receipt.', { id: toastId });
     }
-  };
-
-  const generateOrderNumber = () => {
-    return `TM${Date.now().toString().slice(-6)}`;
   };
 
   if (orderComplete) {
-    console.log('[Debug] Rendering order confirmation modal with values:', {
-      ...orderTotals,
-      orderItems: orderItems?.length
-    });
-    
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center py-12">
-        <div className="absolute inset-0 bg-neutral-600" />
-        <div ref={orderConfirmedModalRef} className="bg-white rounded-xl max-w-4xl w-full mx-4 overflow-hidden relative z-10">
-          {/* Green Header Section */}
-          <div className="bg-gradient-to-r from-green-500 to-green-600 p-8 text-center text-white">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Order Confirmed!</h2>
-            <p className="text-green-100">Thank you for your purchase</p>
-          </div>
-
-          {/* Scrollable Receipt Card */}
-          <div className="p-6 bg-slate-50 max-h-[70vh] overflow-y-auto">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-200">
-                <div className="text-center mb-4">
-                  <h3 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 mb-2">TechMart</h3>
-                  <p className="text-slate-600">Order Receipt</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-600">Order Number:</span>
-                    <p className="font-mono font-bold text-lg text-blue-600">#{orderNumber}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-slate-600">Order Date:</span>
-                    <p className="font-semibold text-slate-900">{new Date().toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-600">Payment Method:</span>
-                    <p className="font-semibold text-slate-900 capitalize">
-                      {paymentMethod === 'card' ? `Card ending in ${paymentInfo.cardNumber.slice(-4)}` : `M-Pesa (${mpesaInfo.phoneNumber})`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-slate-600">Status:</span>
-                    <p className="font-semibold text-green-600">Confirmed</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-b border-slate-200">
-                <h4 className="font-bold mb-4 text-slate-900">Items Ordered</h4>
-                <div className="space-y-4">
-                  {orderItems && orderItems.length > 0 ? (
-                    orderItems.map((item) => {
-                      console.log('[Debug] Rendering item in modal:', item);
-                      return (
-                        <div key={item.product.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-b-0">
-                          <div className="flex items-center space-x-4">
-                            <img 
-                              src={item.product.image} 
-                              alt={item.product.name}
-                              className="w-12 h-12 object-cover rounded-lg"
-                            />
-                            <div>
-                              <p className="font-semibold text-slate-900">{item.product.name}</p>
-                              <p className="text-sm text-slate-600">Qty: {item.quantity} × KES {item.product.price.toLocaleString()}</p>
-                            </div>
-                          </div>
-                          <p className="font-bold text-lg text-slate-900">KES {(item.product.price * item.quantity).toLocaleString()}</p>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center text-slate-500 py-4">
-                      No items found in order
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-6 border-b border-slate-200 bg-slate-50">
-                <div className="space-y-3">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal (incl. VAT):</span>
-                    <span className="font-semibold text-slate-900">KES {orderTotals.subtotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>VAT (16%):</span>
-                    <span className="font-semibold text-slate-900">KES {orderTotals.tax.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Shipping ({shippingInfo.shippingType}):</span>
-                    <span className="font-semibold text-slate-900">{orderTotals.shippingCost === 0 ? 'FREE' : `KES ${orderTotals.shippingCost.toLocaleString()}`}</span>
-                  </div>
-                  <div className="border-t border-slate-200 pt-3">
-                    <div className="flex justify-between text-xl font-bold">
-                      <span className="text-slate-900">Total Amount:</span>
-                      <span className="text-green-600">KES {orderTotals.total.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 bg-slate-50">
-                <h4 className="font-bold mb-3 text-slate-900">Shipping Information</h4>
-                <div className="text-slate-600 space-y-1">
-                  <p className="font-semibold text-slate-900">{shippingInfo.firstName} {shippingInfo.lastName}</p>
-                  <p>{selectedCountyName}, {selectedRegionName}</p>
-                  <p>{shippingInfo.country}</p>
-                  {shippingInfo.email && <p className="text-blue-600">{shippingInfo.email}</p>}
-                  <p>{shippingInfo.phone}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                onClick={handleDownloadReceipt}
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 px-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02]"
-              >
-                <Download className="w-5 h-5" />
-                Download Receipt
-              </button>
-              
-              <button
-                onClick={handleContinueShopping}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-3 px-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02]"
-              >
-                Continue Shopping
-              </button>
-            </div>
-          </div>
+      <div className="max-w-2xl mx-auto px-4 py-16 sm:px-6 lg:px-8 text-center">
+        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+          <Check className="h-10 w-10 text-green-600" />
+        </div>
+        <h1 className="text-3xl font-extrabold text-gray-900">Order Confirmed!</h1>
+        <p className="mt-4 text-lg text-gray-600">Thank you for your purchase.</p>
+        <p className="mt-2 text-md text-gray-500">Your order number is <span className="font-bold text-gray-800">{orderNumber}</span>.</p>
+        <p className="mt-1 text-sm text-gray-500">A confirmation email has been sent to {shippingInfo.email}.</p>
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <button onClick={handleDownloadReceipt} className="w-full sm:w-auto flex items-center justify-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+            <Download className="-ml-1 mr-3 h-5 w-5" />
+            Download Receipt
+          </button>
+          <button onClick={() => navigate('/')} className="w-full sm:w-auto flex items-center justify-center px-6 py-3 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50">
+            Continue Shopping
+          </button>
         </div>
       </div>
     );
@@ -987,14 +541,13 @@ const CheckoutPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
-      {/* Header */}
-      <div className="relative py-8 px-6 border-b border-slate-700">
+      <header className="relative py-8 px-6 border-b border-slate-700">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
         <div className="relative flex flex-col items-center">
           <h1 className="text-2xl font-bold text-center mb-2">Checkout</h1>
           <div className="flex items-center justify-center space-x-8 mt-2">
             <button
-              onClick={() => handleStepClick(1)}
+              onClick={() => setCurrentStep(1)}
               className={`flex items-center ${currentStep >= 1 ? 'text-blue-400' : 'text-slate-400'} transition-colors`}
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-700'}`}>
@@ -1004,7 +557,7 @@ const CheckoutPage: React.FC = () => {
             </button>
             <div className={`w-16 h-0.5 ${currentStep >= 2 ? 'bg-blue-600' : 'bg-slate-700'}`} />
             <button
-              onClick={() => handleStepClick(2)}
+              onClick={() => currentStep > 1 && setCurrentStep(2)}
               className={`flex items-center ${currentStep >= 2 ? 'text-blue-400' : 'text-slate-400'} transition-colors`}
               disabled={!isShippingInfoValid()}
             >
@@ -1016,459 +569,235 @@ const CheckoutPage: React.FC = () => {
           </div>
         </div>
         <div className="absolute top-6 right-6 hidden md:block">
-          <BackButton text="Back to Store" onClick={handleBackToStore} />
+          <BackButton text="Back to Store" onClick={() => navigate(-1)} />
         </div>
-      </div>
+      </header>
 
-      <div className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2">
-            {currentStep === 1 && (
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-                <form onSubmit={handleShippingSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        First Name *
+            {currentStep === 1 ? (
+              <form onSubmit={handleShippingSubmit} className="space-y-6">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+                  <h2 className="text-xl font-semibold mb-6">Shipping Information</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
+                        First Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        required
+                        name="firstName"
                         value={shippingInfo.firstName}
-                        onChange={(e) => setShippingInfo({...shippingInfo, firstName: e.target.value})}
-                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 ${validationErrors.firstName ? 'border-red-500' : ''}`}
+                        placeholder="Enter your first name"
+                        required
                       />
+                      {validationErrors.firstName && <p className="text-xs text-red-500">{validationErrors.firstName}</p>}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Last Name *
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
+                        Last Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        required
+                        name="lastName"
                         value={shippingInfo.lastName}
-                        onChange={(e) => setShippingInfo({...shippingInfo, lastName: e.target.value})}
-                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 ${validationErrors.lastName ? 'border-red-500' : ''}`}
+                        placeholder="Enter your last name"
+                        required
                       />
+                      {validationErrors.lastName && <p className="text-xs text-red-500">{validationErrors.lastName}</p>}
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
                         Email Address
                       </label>
                       <input
                         type="email"
+                        name="email"
                         value={shippingInfo.email}
-                        onChange={(e) => setShippingInfo({...shippingInfo, email: e.target.value})}
-                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
+                        onChange={handleInputChange}
+                        className={`w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 ${validationErrors.email ? 'border-red-500' : ''}`}
+                        placeholder="your.email@example.com"
                       />
+                      {validationErrors.email && <p className="text-xs text-red-500">{validationErrors.email}</p>}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">
-                        Phone Number *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={shippingInfo.phone}
-                        onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
-                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1">
-                        County *
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-slate-400 text-sm font-medium">🇰🇪 +254</span>
+                            <div className="w-px h-5 bg-slate-600"></div>
+                          </div>
+                        </div>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={shippingInfo.phone}
+                          onChange={handlePhoneChange}
+                          onBlur={handlePhoneBlur}
+                          className={`w-full pl-20 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-slate-400 transition-all duration-200 ${validationErrors.phone ? 'border-red-500' : ''}`}
+                          placeholder="712 345 678"
+                          maxLength={11}
+                          required
+                        />
+                        {validationErrors.phone && <p className="text-xs text-red-500">{validationErrors.phone}</p>}
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500">Enter your phone number without the country code</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
+                        County <span className="text-red-500">*</span>
                       </label>
                       <CustomDropdown
                         options={counties}
                         value={shippingInfo.county}
-                        onChange={(value) => setShippingInfo({...shippingInfo, county: value})}
+                        onChange={(value) => handleDropdownChange('county', value)}
                         isLoading={isLoadingLocations}
                         placeholder={isLoadingLocations ? "Loading counties..." : "Select a county"}
                         required
                       />
+                      {validationErrors.county && <p className="text-xs text-red-500">{validationErrors.county}</p>}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1">
-                        Region *
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
+                        Region <span className="text-red-500">*</span>
                       </label>
                       <CustomDropdown
                         options={regions}
                         value={shippingInfo.region}
-                        onChange={(value) => setShippingInfo({...shippingInfo, region: value})}
+                        onChange={(value) => handleDropdownChange('region', value)}
                         isLoading={isLoadingLocations}
                         placeholder={isLoadingLocations ? "Loading regions..." : "Select a region"}
                         disabled={!shippingInfo.county || isLoadingLocations}
-                        tooltipText={!shippingInfo.county ? "Please select a County first" : undefined}
+                        tooltipText={!shippingInfo.county ? "Please select a county first" : undefined}
                         required
                       />
+                      {validationErrors.region && <p className="text-xs text-red-500">{validationErrors.region}</p>}
                     </div>
                   </div>
 
-                  {/* Shipping Costs Section - Only show after region is selected */}
-                  {shippingInfo.region && selectedRegionDetails?.delivery_status === 'paid' && (
-                    <div className="border-t border-slate-700/50 pt-6">
-                      <h3 className="text-lg font-semibold mb-4">Shipping Costs</h3>
-                      <div className="space-y-3">
-                        {shippingOptions.map((option) => (
-                          <label 
-                            key={option.id}
-                            className={`flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
-                              shippingInfo.shippingType === option.id 
-                                ? 'border-blue-500 bg-blue-500/10' 
-                                : 'border-slate-700/50 hover:bg-slate-700/30'
-                            }`}
-                          >
+                  {shippingInfo.region && selectedRegionDetails && (
+                    <div className="mt-6 pt-6 border-t border-slate-700/50">
+                      <h3 className="text-lg font-medium mb-4">Shipping Method</h3>
+                      {selectedRegionDetails.delivery_status === 'free' ? (
+                        <p className="text-green-500 font-medium">Free shipping is available for your location.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {shippingOptions.map(option => (
+                          <div key={option.id} className="relative">
                             <input
                               type="radio"
                               name="shippingType"
+                              id={`shipping-${option.id}`}
                               value={option.id}
                               checked={shippingInfo.shippingType === option.id}
-                              onChange={(e) => setShippingInfo({...shippingInfo, shippingType: e.target.value})}
-                              className="mt-1 text-blue-600"
+                              onChange={(e) => setShippingInfo(prev => ({ ...prev, shippingType: e.target.value }))}
+                              className="peer hidden"
+                              required={selectedRegionDetails.delivery_status !== 'free'}
                             />
-                            <div className="ml-3 flex-1">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <span className="font-medium">{option.name}</span>
-                                  <p className="text-sm text-slate-400 mt-1">{option.description}</p>
-                                  <p className="text-xs text-slate-500 mt-1">Estimated delivery: {option.duration}</p>
+                            <label 
+                              htmlFor={`shipping-${option.id}`}
+                              className={`block p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 h-full
+                                ${shippingInfo.shippingType === option.id 
+                                  ? 'border-blue-500 bg-blue-500/10' 
+                                  : 'border-slate-700 hover:border-slate-600'}`}
+                            >
+                              <div className="flex items-start">
+                                <div className="text-2xl mr-4 mt-0.5">
+                                  {option.icon}
                                 </div>
-                                <span className={`font-semibold ${option.price === 0 ? 'text-green-400' : ''}`}>
-                                  {option.price === 0 ? 'FREE' : `KES ${option.price.toLocaleString()}`}
-                                </span>
+                                <div className="flex-grow">
+                                  <div className="flex justify-between items-start">
+                                    <h4 className="font-semibold text-white">{option.name}</h4>
+                                    <span className={`font-bold ${shippingInfo.shippingType === option.id ? 'text-blue-400' : 'text-white'}`}>
+                                      {option.price === 0 ? 'FREE' : `KES ${option.price.toFixed(2)}`}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-slate-300 mt-1">{option.description}</p>
+                                </div>
                               </div>
-                            </div>
-                          </label>
-                        ))}
+                            </label>
+                            <div className={`absolute -inset-0.5 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 peer-checked:opacity-100 -z-10 transition-opacity duration-200 ${shippingInfo.shippingType === option.id ? 'opacity-100' : ''}`}></div>
+                          </div>
+                          ))}
+                        </div>
                       </div>
+                      )}
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={!isShippingInfoValid()}
-                    className="w-full relative z-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 px-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed enabled:cursor-pointer"
-                  >
-                    Continue to Payment
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {currentStep === 2 && (
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-                {/* Payment Method Selection */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold mb-4">Choose Payment Method</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-8">
-                    {/* M-Pesa Option */}
-                    <div 
-                      className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors overflow-hidden ${
-                        paymentMethod === 'mpesa' 
-                          ? 'border-green-500' 
-                          : 'border-slate-700 hover:border-slate-600'
-                      }`}
-                      onClick={() => setPaymentMethod('mpesa')}
+                  <div className="mt-8 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={!isShippingInfoValid()}
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-blue-600/20" />
-                      <div className="relative z-10 flex items-center w-full">
-                        <div className="flex items-center gap-2">
-                          <Smartphone className="w-5 h-5" />
-                          <span className="font-medium text-sm md:text-base">M-Pesa</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Credit/Debit Card Option */}
-                    <div 
-                      className={`relative flex items-center p-4 border-2 rounded-lg cursor-pointer transition-colors overflow-hidden ${
-                        paymentMethod === 'card' 
-                          ? 'border-blue-500' 
-                          : 'border-slate-700 hover:border-slate-600'
-                      }`}
-                      onClick={() => setPaymentMethod('card')}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
-                      <div className="relative z-10 flex items-center w-full">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-5 h-5" />
-                          <span className="font-medium text-sm md:text-base">Card</span>
-                        </div>
-                      </div>
-                    </div>
+                      Continue to Payment
+                    </button>
                   </div>
                 </div>
-
-                {paymentMethod === 'card' && (
-                  <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-                    <div className="flex items-center gap-2 text-blue-400 mb-4">
-                      <CreditCard className="w-5 h-5" />
-                      <span className="font-semibold">Card Details</span>
-                    </div>
-                    <form onSubmit={handlePaymentSubmit} className="space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Card Number *
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            required
-                            placeholder="1234 5678 9012 3456"
-                            value={paymentInfo.cardNumber}
-                            onChange={(e) => setPaymentInfo({...paymentInfo, cardNumber: formatCardNumber(e.target.value)})}
-                            maxLength={19}
-                            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                            <div className="w-8 h-5 bg-slate-600 rounded flex items-center justify-center">
-                              <CreditCard className="w-4 h-4 text-slate-400" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Expiry Date *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="MM/YY"
-                            value={paymentInfo.expiryDate}
-                            onChange={(e) => setPaymentInfo({...paymentInfo, expiryDate: e.target.value})}
-                            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            CVV *
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              required
-                              placeholder="123"
-                              value={paymentInfo.cvv}
-                              onChange={(e) => setPaymentInfo({...paymentInfo, cvv: e.target.value})}
-                              maxLength={4}
-                              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              <Shield className="w-4 h-4 text-slate-400" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Name on Card *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={paymentInfo.nameOnCard}
-                          onChange={(e) => setPaymentInfo({...paymentInfo, nameOnCard: e.target.value})}
-                          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400"
-                        />
-                      </div>
-
-                      <div className="flex items-center space-x-2 p-4 bg-slate-700/30 rounded-lg border border-slate-600/50">
-                        <input
-                          type="checkbox"
-                          id="sameAsShipping"
-                          checked={paymentInfo.sameAsShipping}
-                          onChange={(e) => setPaymentInfo({...paymentInfo, sameAsShipping: e.target.checked})}
-                          className="rounded border-slate-600 text-blue-600 focus:ring-blue-500 bg-slate-700/50"
-                        />
-                        <label htmlFor="sameAsShipping" className="text-sm text-slate-300">
-                          Billing address same as shipping address
-                        </label>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isProcessing}
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 px-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed enabled:cursor-pointer"
-                      >
-                        {isProcessing ? 'Processing...' : `Pay KES ${total.toLocaleString()}`}
-                      </button>
-                    </form>
+              </form>
+            ) : (
+              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+                <h2 className="text-xl font-semibold mb-6">Complete Your Payment</h2>
+                
+                <UnifiedPaymentForm
+                  onPaymentComplete={handleUnifiedPaymentComplete}
+                  amount={Math.ceil(orderTotals.total)}
+                  email={shippingInfo.email}
+                  firstName={shippingInfo.firstName}
+                  lastName={shippingInfo.lastName}
+                  phone={shippingInfo.phone}
+                  disabled={paymentState.processing}
+                  shippingInfo={shippingInfo}
+                  shippingCost={shippingCost}
+                />
+                
+                {paymentState.error && (
+                  <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <p className="text-red-400 text-sm">{paymentState.error}</p>
                   </div>
                 )}
-
-                {paymentMethod === 'mpesa' && (
-                  <div className="space-y-6">
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-green-400 mb-2">
-                        <Smartphone className="w-5 h-5" />
-                        <span className="font-semibold">M-Pesa Payment</span>
-                      </div>
-                      <p className="text-sm text-green-400/80">
-                        You will receive an M-Pesa prompt on your phone to complete the payment.
-                      </p>
-                    </div>
-
-                    <form onSubmit={handleMpesaSubmit} className="space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          M-Pesa Phone Number *
-                        </label>
-                        <div className="flex group">
-                          <div className="relative inline-flex items-center px-3 py-2 border border-slate-600 bg-slate-700/50 rounded-l-md w-24 group-focus-within:border-green-500 group-focus-within:ring-2 group-focus-within:ring-green-500/20">
-                            <span className="text-slate-300 text-sm">🇰🇪 +254</span>
-                          </div>
-                          <input
-                            type="tel"
-                            required
-                            pattern="[0-9]{3}-[0-9]{3}-[0-9]{3}"
-                            inputMode="numeric"
-                            placeholder="XXX-XXX-XXX"
-                            value={mpesaInfo.phoneNumber.replace('+254', '')}
-                            onChange={(e) => {
-                              // Only allow numbers
-                              const cleanNumber = e.target.value.replace(/[^\d]/g, '');
-                              if (cleanNumber.length <= 9) {
-                                const formatted = formatPhoneNumber(cleanNumber);
-                                setMpesaInfo({...mpesaInfo, phoneNumber: formatted});
-                              }
-                            }}
-                            onKeyPress={(e) => {
-                              // Prevent non-numeric input
-                              if (!/[0-9]/.test(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                            onBlur={(e) => {
-                              // Format the number on blur if it's not empty
-                              const value = e.target.value.replace(/[^\d]/g, '');
-                              if (value.length > 0) {
-                                const formatted = formatPhoneNumber(value);
-                                setMpesaInfo({...mpesaInfo, phoneNumber: formatted});
-                              }
-                            }}
-                            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-r-md focus:outline-none focus:ring-0 text-white placeholder-slate-400 group-focus-within:border-green-500 group-focus-within:ring-2 group-focus-within:ring-green-500/20"
-                          />
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">
-                          Enter your M-Pesa registered phone number (9 digits)
-                        </p>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isProcessing}
-                        className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-3 px-4 rounded-lg font-semibold transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none"
-                      >
-                        {isProcessing ? 'Processing...' : `Pay KES ${total.toLocaleString()}`}
-                      </button>
-                    </form>
-                  </div>
-                )}
-
-                <div className="mt-6 pt-6 border-t border-slate-700/50">
-                  <div className="flex items-center justify-center space-x-6 text-sm text-slate-400">
-                    <div className="flex items-center space-x-1">
-                      <Shield className="w-4 h-4" />
-                      <span>SSL Encrypted</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <CreditCard className="w-4 h-4" />
-                      <span>Secure Payment</span>
-                    </div>
-                  </div>
+                
+                <div className="mt-8 pt-6 border-t border-slate-700/50">
+                  <button 
+                    type="button"
+                    onClick={() => setCurrentStep(1)}
+                    className="px-6 py-2.5 bg-slate-700/50 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+                  >
+                    Back to Shipping
+                  </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6 sticky top-4 z-0">
-              <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
-              
-              <div className="space-y-4 mb-6">
-                {state.items.map((item) => (
-                  <div key={item.product.id} className="flex gap-3">
-                    <img
-                      src={item.product.image_url || 'https://via.placeholder.com/100'}
-                      alt={item.product.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100';
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm truncate">
-                        {item.product.name}
-                      </h4>
-                      <p className="text-sm text-slate-400">Qty: {item.quantity}</p>
-                      <p className="text-sm font-semibold">
-                        KES {(item.product.price * item.quantity).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-3 border-t border-slate-700/50 pt-4">
-                <div className="flex justify-between text-slate-400">
-                  <span className="text-slate-400">Subtotal (incl. VAT)</span>
-                  <span className="font-medium">KES {subtotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span className="text-slate-400">VAT (16%)</span>
-                  <span className="font-medium">KES {tax.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span className="text-slate-400">Shipping</span>
-                  <span className="font-medium">
-                    {shippingCost === 0 ? 'FREE' : `KES ${shippingCost.toLocaleString()}`}
-                  </span>
-                </div>
-                <div className="flex justify-between text-lg font-semibold border-t border-slate-700/50 pt-3">
-                  <span>Total Amount</span>
-                  <span>KES {total.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                <div className="flex items-center space-x-2 text-green-400">
-                  <Shield className="w-4 h-4" />
-                  <span className="text-sm font-medium">Secure Checkout</span>
-                </div>
-                <p className="text-xs text-green-400/80 mt-1">
-                  Your payment information is encrypted and secure
-                </p>
-              </div>
-              <div className="mt-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                <div className="flex items-center space-x-2 text-blue-400">
-                  {/* Use Truck icon for delivery/shipping info */}
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zm10 0a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H6a1 1 0 00-1 1v10m0 0H3m3 0h10m0 0h2.382a1 1 0 00.894-.553l1.382-2.764A1 1 0 0021 12.382V10a1 1 0 00-1-1h-5v7z" /></svg>
-                  <span className="text-sm font-medium">Delivery Information</span>
-                </div>
-                <ul className="text-xs text-blue-400/80 mt-2 space-y-1 list-disc list-inside">
-                  <li>Delivery within Nairobi CBD is <span className="font-semibold text-green-600">free</span>.</li>
-                  <li>For all Orders, payment is required before delivery.</li>
-                  <li>Choose your region to see available delivery options and costs.</li>
-                </ul>
-              </div>
-            </div>
+            <OrderSummaryCard items={state.items} totals={orderTotals} />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
 
-export default CheckoutPage; 
+export default CheckoutPage;

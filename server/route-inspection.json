@@ -1,0 +1,41 @@
+[
+  {
+    "path": "/health",
+    "methods": "GET",
+    "type": "route",
+    "regexp": "",
+    "stack": [
+      {
+        "name": "<anonymous>",
+        "method": "get",
+        "handle": "anonymous"
+      }
+    ]
+  },
+  {
+    "path": "/test",
+    "methods": "GET",
+    "type": "route",
+    "regexp": "",
+    "stack": [
+      {
+        "name": "<anonymous>",
+        "method": "get",
+        "handle": "anonymous"
+      }
+    ]
+  },
+  {
+    "path": "",
+    "methods": "GET",
+    "type": "route",
+    "regexp": "",
+    "stack": [
+      {
+        "name": "<anonymous>",
+        "method": "get",
+        "handle": "anonymous"
+      }
+    ]
+  }
+]

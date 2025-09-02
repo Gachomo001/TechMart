@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide will help you set up the Pesapal integration for production, including environment variables, backend proxy deployment, and production testing.
+This guide will help you set up the M-Pesa integration for production, including environment variables and production testing.
 
 ## Step 1: Environment Variables Setup
 
@@ -11,12 +11,7 @@ This guide will help you set up the Pesapal integration for production, includin
 # Development Mode
 VITE_NODE_ENV=development
 
-# Pesapal Sandbox (for testing)
-VITE_PESAPAL_SANDBOX_CONSUMER_KEY=your_sandbox_consumer_key
-VITE_PESAPAL_SANDBOX_CONSUMER_SECRET=your_sandbox_consumer_secret
-VITE_PESAPAL_SANDBOX_PASSKEY=your_sandbox_passkey
-
-# M-Pesa Receiver Number
+# M-Pesa Configuration
 VITE_MPESA_RECEIVER_NUMBER=your_mpesa_number
 
 # App Configuration
@@ -28,115 +23,33 @@ VITE_APP_URL=http://localhost:5173
 # Production Mode
 VITE_NODE_ENV=production
 
-# Pesapal Production
-VITE_PESAPAL_PRODUCTION_CONSUMER_KEY=your_production_consumer_key
-VITE_PESAPAL_PRODUCTION_CONSUMER_SECRET=your_production_consumer_secret
-VITE_PESAPAL_PRODUCTION_PASSKEY=your_production_passkey
-
-# M-Pesa Receiver Number
+# M-Pesa Configuration
 VITE_MPESA_RECEIVER_NUMBER=your_mpesa_number
 
 # App Configuration
 VITE_APP_URL=https://yourdomain.com
 ```
 
-## Step 2: Supabase Edge Function Setup
+## Step 2: M-Pesa Integration
 
-### Deploy the Edge Function
+### Configuration
 
-1. **Install Supabase CLI** (if not already installed):
-   ```bash
-   npm install -g supabase
+1. **Update config.ts**:
+   ```typescript
+   // src/lib/config.ts
+   export const config = {
+     mpesa: {
+       receiverNumber: import.meta.env.VITE_MPESA_RECEIVER_NUMBER,
+     },
+     app: {
+       name: 'TechMart',
+       url: import.meta.env.VITE_APP_URL,
+       isProduction: import.meta.env.VITE_NODE_ENV === 'production'
+     }
+   };
    ```
 
-2. **Login to Supabase**:
-   ```bash
-   supabase login
-   ```
-
-3. **Link your project**:
-   ```bash
-   supabase link --project-ref your-project-ref
-   ```
-
-4. **Set environment variables for the function**:
-   ```bash
-   supabase secrets set PESAPAL_ENVIRONMENT=sandbox
-   supabase secrets set PESAPAL_SANDBOX_CONSUMER_KEY=your_sandbox_consumer_key
-   supabase secrets set PESAPAL_SANDBOX_CONSUMER_SECRET=your_sandbox_consumer_secret
-   supabase secrets set PESAPAL_PRODUCTION_CONSUMER_KEY=your_production_consumer_key
-   supabase secrets set PESAPAL_PRODUCTION_CONSUMER_SECRET=your_production_consumer_secret
-   ```
-
-5. **Deploy the function**:
-   ```bash
-   supabase functions deploy pesapal-proxy
-   ```
-
-### For Production Deployment:
-```bash
-supabase secrets set PESAPAL_ENVIRONMENT=production
-supabase functions deploy pesapal-proxy
-```
-
-## Step 3: Update Configuration
-
-### Update config.ts for Production
-```typescript
-// src/lib/config.ts
-export const config = {
-  pesapal: {
-    sandbox: {
-      baseUrl: 'https://cybqa.pesapal.com',
-      consumerKey: import.meta.env.VITE_PESAPAL_SANDBOX_CONSUMER_KEY,
-      consumerSecret: import.meta.env.VITE_PESAPAL_SANDBOX_CONSUMER_SECRET,
-      passkey: import.meta.env.VITE_PESAPAL_SANDBOX_PASSKEY,
-      partyC: import.meta.env.VITE_MPESA_RECEIVER_NUMBER,
-    },
-    production: {
-      baseUrl: 'https://www.pesapal.com',
-      consumerKey: import.meta.env.VITE_PESAPAL_PRODUCTION_CONSUMER_KEY,
-      consumerSecret: import.meta.env.VITE_PESAPAL_PRODUCTION_CONSUMER_SECRET,
-      passkey: import.meta.env.VITE_PESAPAL_PRODUCTION_PASSKEY,
-      partyC: import.meta.env.VITE_MPESA_RECEIVER_NUMBER,
-    }
-  },
-  app: {
-    name: 'TechMart',
-    url: import.meta.env.VITE_APP_URL,
-    isProduction: import.meta.env.VITE_NODE_ENV === 'production'
-  }
-};
-```
-
-## Step 4: Production Testing
-
-### Test the Backend Proxy
-
-1. **Test Authentication**:
-   ```bash
-   curl -X POST https://your-project.supabase.co/functions/v1/pesapal-proxy \
-     -H "Content-Type: application/json" \
-     -d '{"action":"auth","data":{}}'
-   ```
-
-2. **Test Payment Initiation**:
-   ```bash
-   curl -X POST https://your-project.supabase.co/functions/v1/pesapal-proxy \
-     -H "Content-Type: application/json" \
-     -d '{
-       "action":"payment",
-       "data":{
-         "token":"your_token",
-         "paymentData":{
-           "id":"TEST_ORDER_123",
-           "currency":"KES",
-           "amount":1000,
-           "description":"Test payment"
-         }
-       }
-     }'
-   ```
+## Step 3: Production Testing
 
 ### Test in Production Mode
 
@@ -153,31 +66,21 @@ export const config = {
 3. **Test the application**:
    - Visit your production URL
    - Go through checkout flow
-   - Verify real API calls are made
+   - Verify M-Pesa payment flow works
 
-## Step 5: Deployment Checklist
+## Step 4: Deployment Checklist
 
 ### Before Going Live:
 
 - [ ] **Environment Variables Set**:
-  - [ ] Production consumer key
-  - [ ] Production consumer secret
-  - [ ] Production passkey
   - [ ] M-Pesa receiver number
   - [ ] Production app URL
-
-- [ ] **Backend Proxy Deployed**:
-  - [ ] Supabase Edge Function deployed
-  - [ ] Environment variables set in Supabase
-  - [ ] Function accessible via HTTPS
 
 - [ ] **Frontend Updated**:
   - [ ] Production build created
   - [ ] Environment variables loaded
-  - [ ] Backend proxy URL configured
 
 - [ ] **Testing Completed**:
-  - [ ] Authentication works
   - [ ] Payment initiation works
   - [ ] Payment status checking works
   - [ ] Callback handling works
@@ -185,90 +88,54 @@ export const config = {
 - [ ] **Security Verified**:
   - [ ] HTTPS enabled
   - [ ] Environment variables secured
-  - [ ] API keys not exposed in client
 
-## Step 6: Monitoring and Maintenance
+## Step 5: Monitoring and Maintenance
 
 ### Set Up Monitoring
 
 1. **Error Tracking**:
-   - Monitor Supabase function logs
+   - Monitor application logs
    - Set up error alerts
    - Track payment success/failure rates
 
 2. **Performance Monitoring**:
    - Monitor API response times
    - Track payment processing times
-   - Monitor callback success rates
 
 ### Regular Maintenance
 
-1. **Token Management**:
-   - Monitor token expiry
-   - Implement token refresh logic
-   - Handle authentication failures
-
-2. **Payment Reconciliation**:
-   - Verify payments in Pesapal dashboard
-   - Cross-check with your database
+1. **Payment Reconciliation**:
+   - Verify payments in your database
    - Handle failed payments
+   - Monitor for any payment issues
 
 ## Troubleshooting
 
 ### Common Issues:
 
-1. **CORS Errors in Production**:
-   - Verify Supabase function is deployed
-   - Check function URL is correct
-   - Ensure CORS headers are set
-
-2. **Authentication Failures**:
-   - Verify credentials are correct
-   - Check environment variables
-   - Monitor function logs
-
-3. **Payment Failures**:
-   - Check Pesapal dashboard
-   - Verify callback URLs
+1. **Payment Failures**:
+   - Verify M-Pesa credentials
+   - Check network connectivity
    - Monitor payment status
 
-### Debug Commands:
+2. **Callback Issues**:
+   - Verify callback URLs
+   - Check server logs for errors
 
-```bash
-# Check function status
-supabase functions list
-
-# View function logs
-supabase functions logs pesapal-proxy
-
-# Test function locally
-supabase functions serve pesapal-proxy
-
-# Update function
-supabase functions deploy pesapal-proxy
-```
+3. **Mobile Money Number Issues**:
+   - Ensure correct phone number format
+   - Verify number is registered for M-Pesa
 
 ## Security Best Practices
 
-1. **Environment Variables**:
-   - Never commit `.env` files
-   - Use different credentials for dev/prod
-   - Rotate credentials regularly
-
-2. **API Security**:
-   - Use HTTPS for all communications
-   - Validate all input data
-   - Implement rate limiting
-
-3. **Data Protection**:
-   - Don't store sensitive card data
+1. **Data Protection**:
    - Encrypt sensitive information
-   - Follow PCI compliance guidelines
+   - Follow payment security best practices
+   - Regularly audit your payment processing
 
 ## Support Resources
 
-- **Pesapal Documentation**: https://developer.pesapal.com
+- **M-Pesa Documentation**: https://developer.safaricom.co.ke/
 - **Supabase Documentation**: https://supabase.com/docs
-- **Pesapal Support**: support@pesapal.com
 
-This setup ensures a secure, scalable, and maintainable production environment for your Pesapal integration. 
+This setup ensures a secure, scalable, and maintainable production environment for your M-Pesa integration.

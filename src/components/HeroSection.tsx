@@ -172,7 +172,7 @@ const HeroSection: React.FC = (): JSX.Element => {
 
   return (
     <div className="relative bg-gray-50 overflow-hidden">
-      <div className="flex flex-col" style={{ height: 'calc(100vh - var(--header-height, 64px) - 0px)' }}>
+      <div className="flex flex-col" style={{ height: 'calc(100vh - var(--header-height, 64px) - 130px)' }}>
         <div className="flex-1 flex overflow-hidden">
           {/* Left Side - Bestsellers Carousel (25% width) */}
           <div className="w-1/4 h-full hidden lg:flex flex-col border-r border-gray-200">

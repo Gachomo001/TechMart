@@ -49,12 +49,12 @@ export const TopBar = () => {
         <div className="flex items-center space-x-2 text-xs sm:text-sm">
           <div className="flex items-center">
             <Phone size={18} className="mr-3" />
-            <span>0796 714113</span>
+            <span>{import.meta.env.VITE_CONTACT_PHONE || '0796 714113'}</span>
           </div>
           <span className="text-blue-200"></span>
           <div className="flex items-center">
             <Mail size={18} className="mr-3" />
-            <span>info@raiyaa.com</span>
+            <span>{import.meta.env.VITE_CONTACT_EMAIL || 'info@raiyaa.com'}</span>
           </div>
         </div>
 

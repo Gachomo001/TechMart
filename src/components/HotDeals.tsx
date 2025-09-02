@@ -119,9 +119,9 @@ const HotDeals: React.FC<HotDealsProps> = ({ onSignInRequired }) => {
 
   if (loading) {
     return (
-      <section className="py-12 bg-white">
+      <section className="pt-6 pb-12 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
+          <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">Hot Deals</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Don't miss out on these amazing discounts for a limited time only
@@ -140,10 +140,10 @@ const HotDeals: React.FC<HotDealsProps> = ({ onSignInRequired }) => {
   }
 
   return (
-    <section className="py-12 bg-white">
+    <section className="pt-6 pb-12 bg-white">
       <div className="w-full px-2 sm:px-4 lg:px-6 xl:px-8 2xl:px-10">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16">
+          <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">Hot Deals</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Don't miss out on these amazing discounts for a limited time only

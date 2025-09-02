@@ -11,7 +11,6 @@ import Cart from './components/Cart';
 import Wishlist from './components/Wishlist';
 import CheckoutPage from './pages/CheckoutPage';
 import PaymentCallback from './pages/PaymentCallback';
-import PaymentTest from './components/PaymentTest';
 import Footer from './components/Footer';
 import Auth from './components/Auth';
 import AllProducts from './pages/AllProducts';
@@ -33,6 +32,8 @@ import { Product } from './types';
 import { supabase } from './lib/supabase';
 import WhatsAppButton from './components/WhatsAppButton';
 import HotDeals from './components/HotDeals';
+import OrderConfirmationModal from './components/OrderConfirmationModal';
+import AuthCallback from './components/AuthCallback';
 
 function App() {
   const location = useLocation();
@@ -41,6 +42,8 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showOrderConfirm, setShowOrderConfirm] = useState(false);
+  const [orderConfirmData, setOrderConfirmData] = useState<any | null>(null);
   const navigate = useNavigate();
   
   // Ref for the featured products section
@@ -220,6 +223,36 @@ function App() {
     }
   }, [searchQuery, selectedCategory]);
 
+  // Detect post-payment redirect and load order confirmation data
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('order_confirm') === '1') {
+      // If this is a page reload, do not reopen the modal. Clear payload and strip param.
+      try {
+        const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+        const isReload = navEntries && navEntries[0]
+          ? navEntries[0].type === 'reload'
+          : (window.performance as any)?.navigation?.type === 1; // legacy fallback
+        if (isReload) {
+          try { localStorage.removeItem('orderConfirmation'); } catch {}
+          navigate({ pathname: '/', search: '' }, { replace: true });
+          return;
+        }
+      } catch {}
+      
+      try {
+        const raw = localStorage.getItem('orderConfirmation');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setOrderConfirmData(parsed);
+          setShowOrderConfirm(true);
+        }
+      } catch (e) {
+        console.warn('[App] Failed to parse orderConfirmation payload:', e);
+      }
+    }
+  }, [location.search]);
+
   return (
     <AuthProvider>
       <CartProvider>
@@ -233,12 +266,12 @@ function App() {
             {/* Customer Routes */}
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/all-products" element={<AllProducts onSignInRequired={handleSignInRequired} />} />
               <Route path="/deals" element={<DealsPage onSignInRequired={handleSignInRequired} />} />
               <Route path="/category/:categorySlug" element={<CategoryPage onSignInRequired={handleSignInRequired} />} />
               <Route path="/checkout" element={<CheckoutPage />} />
               <Route path="/payment/callback" element={<PaymentCallback />} />
-              <Route path="/payment/test" element={<PaymentTest />} />
               <Route path="/" element={
                 <>
                   <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
@@ -274,6 +307,26 @@ function App() {
                   <div className="mt-16 sm:mt-20 md:mt-24 lg:mt-32">
                     <Footer />
                   </div>
+                  {/* Post-payment Order Confirmation Modal */}
+                  {showOrderConfirm && orderConfirmData && (
+                    <OrderConfirmationModal
+                      isOpen={showOrderConfirm}
+                      orderNumber={orderConfirmData.orderNumber}
+                      orderNumberDisplay={orderConfirmData.orderNumberDisplay}
+                      orderItems={orderConfirmData.items}
+                      orderTotals={orderConfirmData.orderTotals}
+                      shippingInfo={orderConfirmData.shippingInfo}
+                      paymentMethod={orderConfirmData.paymentMethod}
+                      paymentDetails={orderConfirmData.paymentDetails}
+                      onContinueShopping={() => {
+                        setShowOrderConfirm(false);
+                        setOrderConfirmData(null);
+                        try { localStorage.removeItem('orderConfirmation'); } catch {}
+                        // Remove the query param from URL
+                        navigate({ pathname: '/', search: '' }, { replace: true });
+                      }}
+                    />
+                  )}
                   {showAuthModal && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                       <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6">

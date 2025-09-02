@@ -104,15 +104,17 @@ const Footer: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Phone className="w-5 h-5 text-blue-400" />
-                <span className="text-gray-300">1-800-RAIYAAA</span>
+                <span className="text-gray-300">{import.meta.env.VITE_CONTACT_PHONE || '1-800-RAIYAAA'}</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="w-5 h-5 text-blue-400" />
-                <span className="text-gray-300">support@raiyaaa.com</span>
+                <span className="text-gray-300">{import.meta.env.VITE_CONTACT_EMAIL || 'support@raiyaaa.com'}</span>
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className="w-5 h-5 text-blue-400" />
-                <span className="text-gray-300">123 Raiyaaa Street, Silicon Valley</span>
+                <span className="text-gray-300">
+                  {import.meta.env.VITE_CONTACT_LOCATION || '123 Raiyaaa Street, Silicon Valley'}
+                </span>
               </div>
             </div>
             

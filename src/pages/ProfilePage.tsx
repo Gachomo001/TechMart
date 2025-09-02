@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -288,20 +288,39 @@ const Dashboard: React.FC<{ userId: string }> = ({ userId }) => {
                   
                   {order.order_items && order.order_items.length > 0 && (
                     <div className="space-y-2">
-                      {order.order_items.slice(0, 2).map((item) => (
+                      {order.order_items.slice(0, 2).map((item) => {
+                      const productImage = item.product?.image_url || '';
+                      const productName = item.product?.name || 'Product';
+                      
+                      return (
                         <div key={item.id} className="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                            {item.product?.image_url ? (
-                              <img src={item.product.image_url} alt={item.product.name} className="w-4 h-4 sm:w-6 sm:h-6 object-cover rounded" />
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {productImage ? (
+                              <img 
+                                src={productImage} 
+                                alt={productName} 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to package icon if image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.style.display = 'none';
+                                  const fallback = document.createElement('div');
+                                  fallback.className = 'w-full h-full flex items-center justify-center';
+                                  fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>';
+                                  target.parentNode?.insertBefore(fallback, target.nextSibling);
+                                }}
+                              />
                             ) : (
                               <Package className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
                             )}
                           </div>
-                          <span className="flex-1 text-gray-700 truncate">{item.product?.name || 'Product'}</span>
+                          <span className="flex-1 text-gray-700 truncate">{productName}</span>
                           <span className="text-gray-500 flex-shrink-0">x{item.quantity}</span>
                           <span className="font-medium flex-shrink-0">{formatCurrency(item.price_at_time)}</span>
                         </div>
-                      ))}
+                      );
+                    })}
                       {order.order_items.length > 2 && (
                         <p className="text-xs sm:text-sm text-gray-500">+{order.order_items.length - 2} more items</p>
                       )}
@@ -469,20 +488,39 @@ const Orders: React.FC<{ userId: string }> = ({ userId }) => {
                 {order.order_items && order.order_items.length > 0 && (
                   <div className="space-y-3 mb-4">
                     <h4 className="font-medium text-gray-900 text-sm sm:text-base">Items:</h4>
-                    {order.order_items.map((item) => (
-                      <div key={item.id} className="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                          {item.product?.image_url ? (
-                            <img src={item.product.image_url} alt={item.product.name} className="w-6 h-6 sm:w-8 sm:h-8 object-cover rounded" />
-                          ) : (
-                            <Package className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
-                          )}
+                    {order.order_items.map((item) => {
+                      const productImage = item.product?.image_url || '';
+                      const productName = item.product?.name || 'Product';
+                      
+                      return (
+                        <div key={item.id} className="flex items-center space-x-2 sm:space-x-3 text-xs sm:text-sm">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {productImage ? (
+                              <img 
+                                src={productImage} 
+                                alt={productName} 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to package icon if image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.style.display = 'none';
+                                  const fallback = document.createElement('div');
+                                  fallback.className = 'w-full h-full flex items-center justify-center';
+                                  fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>';
+                                  target.parentNode?.insertBefore(fallback, target.nextSibling);
+                                }}
+                              />
+                            ) : (
+                              <Package className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+                            )}
+                          </div>
+                          <span className="flex-1 text-gray-700 truncate">{productName}</span>
+                          <span className="text-gray-500 flex-shrink-0">x{item.quantity}</span>
+                          <span className="font-medium flex-shrink-0">{formatCurrency(item.price_at_time)}</span>
                         </div>
-                        <span className="flex-1 text-gray-700 truncate">{item.product?.name || 'Product'}</span>
-                        <span className="text-gray-500 flex-shrink-0">x{item.quantity}</span>
-                        <span className="font-medium flex-shrink-0">{formatCurrency(item.price_at_time)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 
@@ -555,9 +593,23 @@ const Orders: React.FC<{ userId: string }> = ({ userId }) => {
                   <div className="space-y-3">
                     {selectedOrder.order_items?.map((item) => (
                       <div key={item.id} className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {item.product?.image_url ? (
-                            <img src={item.product.image_url} alt={item.product.name} className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded" />
+                            <img 
+                              src={item.product.image_url} 
+                              alt={item.product.name} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback to package icon if image fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null;
+                                target.style.display = 'none';
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-full h-full flex items-center justify-center';
+                                fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>';
+                                target.parentNode?.insertBefore(fallback, target.nextSibling);
+                              }}
+                            />
                           ) : (
                             <Package className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
                           )}
@@ -612,6 +664,7 @@ const Security: React.FC<{ userId: string }> = ({ userId }) => {
     recentActivity: [] as any[],
     sslCertificate: true
   });
+  const [twoFactorData, setTwoFactorData] = useState<TwoFactorAuth | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
   const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetup | null>(null);
@@ -635,17 +688,17 @@ const Security: React.FC<{ userId: string }> = ({ userId }) => {
         if (profileError) throw profileError;
 
         // Fetch 2FA status
-        let twoFactorData = null;
         try {
           const { data } = await supabase
             .from('two_factor_auth')
             .select('*')
             .eq('user_id', userId)
             .single();
-          twoFactorData = data;
+          setTwoFactorData(data || { enabled: false });
         } catch (error) {
           // Table might not exist yet, ignore the error
           console.log('2FA table not found, using default settings');
+          setTwoFactorData({ enabled: false });
         }
 
         // Fetch recent login activity (you might need to create this table)
@@ -760,25 +813,29 @@ const Security: React.FC<{ userId: string }> = ({ userId }) => {
         return;
       }
 
+      const twoFactorData: TwoFactorAuth = {
+        enabled: true,
+        secret: twoFactorSetup.secret,
+        backup_codes: backupCodes,
+        created_at: new Date().toISOString()
+      };
+
       // Save 2FA data to database
       const { error } = await supabase
         .from('two_factor_auth')
         .upsert({
           user_id: userId,
-          enabled: true,
-          secret: twoFactorSetup.secret,
-          backup_codes: backupCodes,
-          created_at: new Date().toISOString()
+          ...twoFactorData
         });
 
       if (error) throw error;
 
       // Update local state
+      setTwoFactorData(twoFactorData);
       setSecurityData(prev => ({ ...prev, twoFactorEnabled: true }));
       setShowTwoFactorSetup(false);
       setTwoFactorSetup(null);
       setVerificationCode('');
-      setBackupCodes([]);
       
       toast.success('Two-factor authentication enabled successfully!');
       
@@ -798,6 +855,7 @@ const Security: React.FC<{ userId: string }> = ({ userId }) => {
 
       if (error) throw error;
 
+      setTwoFactorData({ enabled: false });
       setSecurityData(prev => ({ ...prev, twoFactorEnabled: false }));
       toast.success('Two-factor authentication disabled');
       

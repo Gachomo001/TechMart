@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ExternalLink, Eye, EyeOff, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, ExternalLink, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface FooterLink {
@@ -173,36 +173,6 @@ const FooterLinks: React.FC = () => {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete link');
-    }
-  };
-
-  const toggleActive = async (link: FooterLink) => {
-    if (!access_token) {
-      setError('Authentication required');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/footer-links/${link.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ is_active: !link.is_active })
-      });
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Authentication failed. Please sign in again.');
-        }
-        throw new Error('Failed to update link status');
-      }
-
-      await fetchLinks();
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update link');
     }
   };
 
@@ -476,11 +446,6 @@ const FooterLinks: React.FC = () => {
                           {link.opens_in_new_tab && (
                             <ExternalLink className="w-4 h-4 text-slate-400" />
                           )}
-                          {!link.is_active && (
-                            <span className="px-2 py-1 text-xs bg-red-900/50 text-red-300 rounded">
-                              Inactive
-                            </span>
-                          )}
                         </div>
                         <p className="text-sm text-slate-400 truncate mt-1">{link.url}</p>
                       </div>
@@ -498,14 +463,6 @@ const FooterLinks: React.FC = () => {
                           className="p-1 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <ArrowDown className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => toggleActive(link)}
-                          disabled={submitting}
-                          className="p-2 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title={link.is_active ? 'Deactivate' : 'Activate'}
-                        >
-                          {link.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={() => startEdit(link)}

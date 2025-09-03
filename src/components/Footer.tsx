@@ -1,11 +1,69 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin } from 'lucide-react';
 
+interface FooterLink {
+  id: string;
+  section_name: string;
+  title: string;
+  url: string;
+  order_index: number;
+  is_active: boolean;
+  opens_in_new_tab: boolean;
+}
+
 const Footer: React.FC = () => {
+  const [footerLinks, setFooterLinks] = useState<Record<string, FooterLink[]>>({});
+  const [loading, setLoading] = useState(true);
+
   const facebookUrl = import.meta.env.VITE_FACEBOOK_URL;
   const twitterUrl = import.meta.env.VITE_TWITTER_URL;
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL;
   const whatsappUrl = `https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER}`;
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+  useEffect(() => {
+    fetchFooterLinks();
+  }, []);
+
+  const fetchFooterLinks = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/footer-links`);
+      if (response.ok) {
+        const data = await response.json();
+        setFooterLinks(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch footer links:', error);
+      // Fallback to default links if API fails
+      setFooterLinks({
+        'Quick Links': [
+          { id: '1', section_name: 'Quick Links', title: 'About Us', url: '#', order_index: 0, is_active: true, opens_in_new_tab: false },
+          { id: '2', section_name: 'Quick Links', title: 'Contact', url: '#', order_index: 1, is_active: true, opens_in_new_tab: false },
+          { id: '3', section_name: 'Quick Links', title: 'Careers', url: '#', order_index: 2, is_active: true, opens_in_new_tab: false },
+          { id: '4', section_name: 'Quick Links', title: 'Press', url: '#', order_index: 3, is_active: true, opens_in_new_tab: false },
+          { id: '5', section_name: 'Quick Links', title: 'Blog', url: '#', order_index: 4, is_active: true, opens_in_new_tab: false },
+        ],
+        'Customer Service': [
+          { id: '6', section_name: 'Customer Service', title: 'Help Center', url: '#', order_index: 0, is_active: true, opens_in_new_tab: false },
+          { id: '7', section_name: 'Customer Service', title: 'Returns', url: '#', order_index: 1, is_active: true, opens_in_new_tab: false },
+          { id: '8', section_name: 'Customer Service', title: 'Shipping Info', url: '#', order_index: 2, is_active: true, opens_in_new_tab: false },
+          { id: '9', section_name: 'Customer Service', title: 'Warranty', url: '#', order_index: 3, is_active: true, opens_in_new_tab: false },
+          { id: '10', section_name: 'Customer Service', title: 'Track Order', url: '#', order_index: 4, is_active: true, opens_in_new_tab: false },
+        ]
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLinkClick = (link: FooterLink) => {
+    if (link.opens_in_new_tab) {
+      window.open(link.url, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = link.url;
+    }
+  };
 
   return (
     <footer className="bg-slate-900 text-white">
@@ -74,29 +132,26 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold">Quick Links</h4>
-            <ul className="space-y-2">
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">About Us</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Contact</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Careers</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Press</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Blog</a></li>
-            </ul>
-          </div>
-
-          {/* Customer Service */}
-          <div className="space-y-4">
-            <h4 className="text-lg font-semibold">Customer Service</h4>
-            <ul className="space-y-2">
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Help Center</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Returns</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Shipping Info</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Warranty</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Track Order</a></li>
-            </ul>
-          </div>
+          {/* Dynamic Footer Links */}
+          {!loading && Object.keys(footerLinks).map((sectionName) => (
+            <div key={sectionName} className="space-y-4">
+              <h4 className="text-lg font-semibold">{sectionName}</h4>
+              <ul className="space-y-2">
+                {footerLinks[sectionName]
+                  .sort((a, b) => a.order_index - b.order_index)
+                  .map((link) => (
+                    <li key={link.id}>
+                      <button
+                        onClick={() => handleLinkClick(link)}
+                        className="text-gray-300 hover:text-white transition-colors text-left"
+                      >
+                        {link.title}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
 
           {/* Contact Info */}
           <div className="space-y-4">
@@ -139,7 +194,7 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-700 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2025 Raiyaaa. All rights reserved.
+              &copy; 2025 Raiyaaa. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</a>

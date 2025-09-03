@@ -22,6 +22,7 @@ interface SnackbarState {
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
+  access_token: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, userData: { first_name: string; last_name: string }) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -39,6 +40,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [access_token, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<SnackbarState>({ isVisible: false, message: '', type: 'info' });
 
@@ -46,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      setAccessToken(session?.access_token ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
       }
@@ -55,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state change:', event, session?.user?.email);
       setUser(session?.user ?? null);
+      setAccessToken(session?.access_token ?? null);
       
       if (session?.user) {
         // Check if this is a new OAuth user (Google Sign-In)
@@ -402,6 +406,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear local state first
       setUser(null);
       setProfile(null);
+      setAccessToken(null);
       
       // Sign out from Supabase with scope 'global' to clear all sessions
       const { error } = await supabase.auth.signOut({ scope: 'global' });
@@ -452,6 +457,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{ 
       user, 
       profile, 
+      access_token,
       signIn, 
       signUp, 
       signInWithGoogle, 

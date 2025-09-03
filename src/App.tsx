@@ -26,6 +26,7 @@ import SubCategories from './pages/admin/SubCategories';
 import Users from './pages/admin/Users';
 import DeliveryLocations from './pages/admin/DeliveryLocations';
 import DeliveryCosts from './pages/admin/DeliveryCosts';
+import FooterLinks from './components/admin/FooterLinks';
 import CategoryPage from './pages/CategoryPage';
 import ProfilePage from './pages/ProfilePage';
 import { Product } from './types';
@@ -375,6 +376,7 @@ function App() {
                 <Route path="users" element={<Users />} />
                 <Route path="delivery-locations" element={<DeliveryLocations />} />
                 <Route path="delivery-costs" element={<DeliveryCosts />} />
+                <Route path="footer-links" element={<FooterLinks />} />
               </Route>
             </Routes>
           </div>

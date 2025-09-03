@@ -15,7 +15,8 @@ import {
   User,
   ChevronDown,
   MapPin,
-  DollarSign
+  DollarSign,
+  ExternalLink
 } from 'lucide-react';
 import BackButton from '../BackButton';
 
@@ -64,6 +65,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
     { name: 'Delivery Costs', href: '/admin/delivery-costs', icon: DollarSign },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Footer Links', href: '/admin/footer-links', icon: ExternalLink },
   ];
 
   const handleSignOut = async () => {
@@ -81,7 +83,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = () => {
       '/admin/analytics': 'Detailed insights and reports about your store\'s performance',
       '/admin/users': 'Manage user accounts, roles, and permissions',
       '/admin/delivery-locations': 'Manage delivery counties and regions for order fulfillment',
-      '/admin/delivery-costs': 'Set and manage delivery costs for regions with paid delivery'
+      '/admin/delivery-costs': 'Set and manage delivery costs for regions with paid delivery',
+      '/admin/footer-links': 'Manage footer links for your store',
     };
 
     return {

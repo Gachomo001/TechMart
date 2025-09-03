@@ -6,6 +6,7 @@ import express, { Request, Response, NextFunction, json } from 'express';
 import { mpesaRouter } from './routes/mpesa.js';
 import { cardRouter } from './routes/card.js';
 import locationsRouter from './routes/locations.js';
+import footerLinksRouter from './routes/footer-links.js';
 import cors, { CorsOptions } from 'cors';
 import * as dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -163,6 +164,10 @@ const mountRoutes = () => {
     // Mount locations route
     console.log('Mounting Locations routes at /api/locations');
     app.use('/api/locations', locationsRouter);
+    
+    // Mount footer links route
+    console.log('Mounting Footer Links routes at /api/footer-links');
+    app.use('/api/footer-links', footerLinksRouter);
     
     // Health check endpoint
     app.get('/api/health', (req, res) => {

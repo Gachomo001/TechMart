@@ -305,8 +305,28 @@ const verifyToken = async (req: ExpressRequest, res: Response, next: NextFunctio
       });
     }
     
-    // Attach user to request
-    req.user = user;
+    // Fetch user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('Profile fetch failed:', profileError);
+      return res.status(403).json({
+        success: false,
+        error: 'User profile not found',
+        code: 'PROFILE_NOT_FOUND'
+      });
+    }
+    
+    // Attach authenticated user to request
+    req.user = {
+      id: user.id,
+      email: user.email || undefined,
+      profile: profile
+    };
     next();
   } catch (error) {
     console.error('Token verification error:', error);
@@ -419,6 +439,13 @@ cardRouter.post('/order/init', verifyToken, csrfProtection, apiLimiter, async (r
     // Generate server order_number
     const order_number = await generateUniqueOrderNumber();
 
+    // Extract notes from shipping_info if present
+    const notes = shipping_info.notes || null;
+    
+    // Clean shipping_info for storage (remove notes as it's stored separately)
+    const cleanShippingInfo = { ...shipping_info };
+    delete cleanShippingInfo.notes;
+
     const insertPayload: any = {
       user_id: userId,
       status: 'pending',
@@ -428,7 +455,8 @@ cardRouter.post('/order/init', verifyToken, csrfProtection, apiLimiter, async (r
       total_amount: amount,
       shipping_cost,
       shipping_type,
-      shipping_info,
+      shipping_info: cleanShippingInfo,
+      notes,
       subtotal,
       tax_amount,
       order_number,

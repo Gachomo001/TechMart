@@ -13,6 +13,7 @@ import BackButton from '@/components/BackButton';
 import CustomDropdown from '@/components/CustomDropdown';
 import UnifiedPaymentForm from '@/components/Payment/UnifiedPaymentForm';
 import OrderSummaryCard from '@/components/checkout/OrderSummaryCard';
+import CustomLocationModal from '@/components/CustomLocationModal';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -32,6 +33,12 @@ interface ShippingInfo {
   region: string;
   country: string;
   shippingType: string;
+  notes?: string;
+  // Custom location support
+  customCounty?: string;
+  customRegion?: string;
+  isCustomLocation?: boolean;
+  customCountyDeliveryCosts?: any;
 }
 
 interface ValidationErrors {
@@ -112,6 +119,7 @@ const CheckoutPage: React.FC = () => {
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [selectedRegionDetails, setSelectedRegionDetails] = useState<RegionDetails | null>(null);
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [isCustomLocationModalOpen, setIsCustomLocationModalOpen] = useState(false);
 
   const shippingCost = useMemo(() => {
     if (selectedRegionDetails?.delivery_status === 'free') return 0;
@@ -188,12 +196,176 @@ const CheckoutPage: React.FC = () => {
     }
   }, [shippingInfo.county]);
 
+  const handleCustomLocationSave = (customCounty: string, customRegion: string, countyDeliveryCosts?: any) => {
+    // Find the county ID for the selected custom county
+    const selectedCounty = counties.find(c => c.label === customCounty);
+    const countyId = selectedCounty ? selectedCounty.value : 'custom';
+    
+    setShippingInfo(prev => ({ 
+      ...prev, 
+      customCounty, 
+      customRegion, 
+      isCustomLocation: true,
+      customCountyDeliveryCosts: countyDeliveryCosts,
+      // Populate the County and Region fields with actual county ID and custom region
+      county: countyId,
+      region: 'custom'
+    }));
+    setIsCustomLocationModalOpen(false);
+    
+    // Set shipping options based on county delivery costs
+    if (countyDeliveryCosts) {
+      const costs = countyDeliveryCosts;
+      const options = [
+        { 
+          id: 'collect', 
+          name: 'Collect at the Shop', 
+          description: 'Pick up your order from our store.', 
+          price: 0,
+          icon: '🏪' 
+        },
+        { 
+          id: 'standard', 
+          name: 'Standard Delivery', 
+          description: 'For items under 5kg (electronics, small accessories)', 
+          price: costs.standard_delivery_cost,
+          icon: '🚚' 
+        },
+        { 
+          id: 'express', 
+          name: 'Express Delivery', 
+          description: 'For items 5-15kg (medium electronics, small appliances)', 
+          price: costs.express_delivery_cost,
+          icon: '⚡' 
+        },
+        { 
+          id: 'heavy', 
+          name: 'Heavy Items', 
+          description: 'For items 15-30kg (large appliances, Standard PC Builds)', 
+          price: costs.heavy_items_cost,
+          icon: '🏋️' 
+        },
+        { 
+          id: 'bulky', 
+          name: 'Bulky Items', 
+          description: 'For items over 30kg (large PC Builds, multiple items)', 
+          price: costs.bulky_items_cost,
+          icon: '📦' 
+        },
+      ].filter(option => option.price > 0 || option.id === 'collect');
+      
+      setShippingOptions(options);
+      setShippingInfo(prev => ({ 
+        ...prev, 
+        shippingType: options.length > 0 ? options[0].id : '' 
+      }));
+      
+      // Set region details for custom location
+      setSelectedRegionDetails({
+        delivery_status: 'paid',
+        delivery_costs: costs
+      });
+    } else {
+      // Use standard rates if no county delivery costs found
+      const standardOptions = [
+        { id: 'collect', name: 'Collect at the Shop', description: 'Pick up your order from our store - FREE', price: 0, icon: '🏪' },
+        { id: 'standard', name: 'Standard Delivery', description: 'For items under 5kg (electronics, small accessories)', price: 200, icon: '🚚' },
+        { id: 'express', name: 'Express Delivery', description: 'For items 5-15kg (medium electronics, small appliances)', price: 350, icon: '⚡' },
+        { id: 'heavy', name: 'Heavy Items', description: 'For items 15-30kg (large appliances, Standard PC Builds)', price: 500, icon: '🏋️' },
+        { id: 'bulky', name: 'Bulky Items', description: 'For items over 30kg (large PC Builds, multiple items)', price: 750, icon: '📦' },
+      ];
+      
+      setShippingOptions(standardOptions);
+      setShippingInfo(prev => ({ 
+        ...prev, 
+        shippingType: standardOptions[0].id 
+      }));
+      
+      setSelectedRegionDetails({
+        delivery_status: 'paid',
+        delivery_costs: {
+          standard_delivery_cost: 200,
+          express_delivery_cost: 350,
+          heavy_items_cost: 500,
+          bulky_items_cost: 750
+        }
+      });
+    }
+  };
+
   useEffect(() => {
+    let isActive = true; // Cleanup flag to prevent race conditions
+
     const fetchShippingCosts = async () => {
       if (!shippingInfo.region) {
-        setShippingOptions([]);
-        setSelectedRegionDetails(null);
-        setShippingInfo(prev => ({ ...prev, shippingType: '' }));
+        if (isActive) {
+          setShippingOptions([]);
+          setSelectedRegionDetails(null);
+          setShippingInfo(prev => ({ ...prev, shippingType: '' }));
+        }
+        return;
+      }
+
+      // If custom region, use county delivery costs - no database queries needed
+      if (shippingInfo.region === 'custom') {
+        // Use county delivery costs if available, otherwise use standard rates
+        const costs = shippingInfo.customCountyDeliveryCosts || {
+          standard_delivery_cost: 200,
+          express_delivery_cost: 350,
+          heavy_items_cost: 500,
+          bulky_items_cost: 750
+        };
+        
+        const options = [
+          { 
+            id: 'collect', 
+            name: 'Collect at the Shop', 
+            description: 'Pick up your order from our store - FREE', 
+            price: 0,
+            icon: '🏪' 
+          },
+          { 
+            id: 'standard', 
+            name: 'Standard Delivery', 
+            description: 'For items under 5kg (electronics, small accessories)', 
+            price: costs.standard_delivery_cost,
+            icon: '🚚' 
+          },
+          { 
+            id: 'express', 
+            name: 'Express Delivery', 
+            description: 'For items 5-15kg (medium electronics, small appliances)', 
+            price: costs.express_delivery_cost,
+            icon: '⚡' 
+          },
+          { 
+            id: 'heavy', 
+            name: 'Heavy Items', 
+            description: 'For items 15-30kg (large appliances, Standard PC Builds)', 
+            price: costs.heavy_items_cost,
+            icon: '🏋️' 
+          },
+          { 
+            id: 'bulky', 
+            name: 'Bulky Items', 
+            description: 'For items over 30kg (large PC Builds, multiple items)', 
+            price: costs.bulky_items_cost,
+            icon: '📦' 
+          },
+        ].filter(option => option.price > 0 || option.id === 'collect');
+        
+        if (isActive) {
+          setShippingOptions(options);
+          setShippingInfo(prev => ({ 
+            ...prev, 
+            shippingType: options.length > 0 ? options[0].id : '' 
+          }));
+          
+          setSelectedRegionDetails({
+            delivery_status: 'paid',
+            delivery_costs: costs
+          });
+        }
         return;
       }
 
@@ -212,27 +384,23 @@ const CheckoutPage: React.FC = () => {
           .from('locations')
           .select('delivery_status')
           .eq('id', shippingInfo.region)
-          .single();
+          .single()
 
 
-        if (deliveryCostsError || locationError) {
-          throw new Error(deliveryCostsError?.message || locationError?.message);
-        }
+        // Check if component is still active before updating state
+        if (!isActive) return;
 
-        const correctedDetails: RegionDetails = {
-          delivery_status: locationData?.delivery_status || null,
-          delivery_costs: deliveryCostsData,
-        };
-
-        setSelectedRegionDetails(correctedDetails);
-
-        if (correctedDetails.delivery_status === 'free') {
-          setShippingOptions([]);
-          setShippingInfo(prev => ({ ...prev, shippingType: 'free' }));
-          toast.success('Free shipping available!', { id: toastId });
-        } else if (correctedDetails.delivery_costs) {
-          const costs = correctedDetails.delivery_costs;
+        // If region delivery costs not found, try to use county delivery costs
+        if (deliveryCostsError && shippingInfo.customCountyDeliveryCosts) {
+          const costs = shippingInfo.customCountyDeliveryCosts;
           const options = [
+            { 
+              id: 'collect', 
+              name: 'Collect at the Shop', 
+              description: 'Pick up your order from our store - FREE', 
+              price: 0,
+              icon: '🏪' 
+            },
             { 
               id: 'standard', 
               name: 'Standard Delivery', 
@@ -261,12 +429,82 @@ const CheckoutPage: React.FC = () => {
               price: costs.bulky_items_cost,
               icon: '📦' 
             },
-          ].filter(option => option.price > 0); // Only show options with a price > 0
+          ].filter(option => option.price > 0 || option.id === 'collect');
           
           setShippingOptions(options);
           setShippingInfo(prev => ({ 
             ...prev, 
             shippingType: options.length > 0 ? options[0].id : '' 
+          }));
+          
+          setSelectedRegionDetails({
+            delivery_status: 'paid',
+            delivery_costs: costs
+          });
+          toast.success('Using county delivery rates for this region.', { id: toastId });
+          return;
+        }
+
+        if (deliveryCostsError || locationError) {
+          throw new Error(deliveryCostsError?.message || locationError?.message);
+        }
+
+        const correctedDetails: RegionDetails = {
+          delivery_status: locationData?.delivery_status || null,
+          delivery_costs: deliveryCostsData,
+        };
+
+        setSelectedRegionDetails(correctedDetails);
+
+        if (correctedDetails.delivery_status === 'free') {
+          setShippingOptions([]);
+          setShippingInfo(prev => ({ ...prev, shippingType: 'free' }));
+          toast.success('Free shipping available!', { id: toastId });
+        } else if (correctedDetails.delivery_costs) {
+          const costs = correctedDetails.delivery_costs;
+          const options = [
+            { 
+              id: 'collect', 
+              name: 'Collect at the Shop', 
+              description: 'Pick up your order from our store - FREE', 
+              price: 0,
+              icon: '🏪' 
+            },
+            { 
+              id: 'standard', 
+              name: 'Standard Delivery', 
+              description: 'For items under 5kg (electronics, small accessories)', 
+              price: costs.standard_delivery_cost,
+              icon: '🚚' 
+            },
+            { 
+              id: 'express', 
+              name: 'Express Delivery', 
+              description: 'For items 5-15kg (medium electronics, small appliances)', 
+              price: costs.express_delivery_cost,
+              icon: '⚡' 
+            },
+            { 
+              id: 'heavy', 
+              name: 'Heavy Items', 
+              description: 'For items 15-30kg (large appliances, Standard PC Builds)', 
+              price: costs.heavy_items_cost,
+              icon: '🏋️' 
+            },
+            { 
+              id: 'bulky', 
+              name: 'Bulky Items', 
+              description: 'For items over 30kg (large PC Builds, multiple items)', 
+              price: costs.bulky_items_cost,
+              icon: '📦' 
+            },
+          ].filter(option => option.price > 0 || option.id === 'collect');
+          
+          setShippingOptions(options);
+          const newShippingType = options.length > 0 ? options[0].id : '';
+          setShippingInfo(prev => ({ 
+            ...prev, 
+            shippingType: newShippingType 
           }));
           
           if (options.length > 0) {
@@ -280,12 +518,19 @@ const CheckoutPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Error fetching shipping costs:', err);
-        toast.error('Could not load shipping options.', { id: toastId });
+        if (isActive) {
+          toast.error('Could not load shipping options.', { id: toastId });
+        }
       }
     };
 
     fetchShippingCosts();
-  }, [shippingInfo.region]);
+
+    // Cleanup function to prevent race conditions
+    return () => {
+      isActive = false;
+    };
+  }, [shippingInfo.region, shippingInfo.customCountyDeliveryCosts]);
 
   const formatPhoneNumber = (value: string): string => {
     const numbers = value.replace(/[^0-9]/g, '');
@@ -294,20 +539,51 @@ const CheckoutPage: React.FC = () => {
     return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6, 9)}`;
   };
 
+  // Normalize phone number from various formats to Kenyan mobile format
+  const normalizePhoneNumber = (value: string): string => {
+    // Remove all non-numeric characters
+    let numbers = value.replace(/[^\d]/g, '');
+    
+    // Handle different formats:
+    // +254745676546 or 254745676546 -> 745676546
+    if (numbers.startsWith('254') && numbers.length === 12) {
+      numbers = numbers.substring(3);
+    }
+    // 0745676546 -> 745676546
+    else if (numbers.startsWith('0') && numbers.length === 10) {
+      numbers = numbers.substring(1);
+    }
+    
+    // Ensure we only keep 9 digits max (Kenyan mobile format)
+    return numbers.substring(0, 9);
+  };
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const cleanNumber = e.target.value.replace(/[^\d]/g, '');
-    if (cleanNumber.length <= 9) {
+    const normalizedNumber = normalizePhoneNumber(e.target.value);
+    if (normalizedNumber.length <= 9) {
       setShippingInfo(prev => ({
         ...prev,
-        phone: cleanNumber
+        phone: normalizedNumber
+      }));
+    }
+  };
+
+  // Handle browser autofill and paste events
+  const handlePhoneInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const target = e.target as HTMLInputElement;
+    const normalizedNumber = normalizePhoneNumber(target.value);
+    if (normalizedNumber !== shippingInfo.phone && normalizedNumber.length <= 9) {
+      setShippingInfo(prev => ({
+        ...prev,
+        phone: normalizedNumber
       }));
     }
   };
 
   const handlePhoneBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^\d]/g, '');
-    if (value.length > 0) {
-      const formatted = formatPhoneNumber(value);
+    const normalizedNumber = normalizePhoneNumber(e.target.value);
+    if (normalizedNumber.length > 0) {
+      const formatted = formatPhoneNumber(normalizedNumber);
       setShippingInfo(prev => ({
         ...prev,
         phone: formatted
@@ -365,6 +641,13 @@ const CheckoutPage: React.FC = () => {
         const costs = correctedDetails.delivery_costs;
         const options = [
           { 
+            id: 'collect', 
+            name: 'Collect at the Shop', 
+            description: 'Pick up your order from our store - FREE', 
+            price: 0,
+            icon: '🏪' 
+          },
+          { 
             id: 'standard', 
             name: 'Standard Delivery', 
             description: 'For items under 5kg (electronics, small accessories)', 
@@ -392,11 +675,14 @@ const CheckoutPage: React.FC = () => {
             price: costs.bulky_items_cost,
             icon: '📦' 
           },
-        ].filter(option => option.price > 0);
+        ].filter(option => option.price > 0 || option.id === 'collect');
         
         setShippingOptions(options);
         const newShippingType = options.length > 0 ? options[0].id : '';
-        setShippingInfo(prev => ({ ...prev, shippingType: newShippingType }));
+        setShippingInfo(prev => ({ 
+          ...prev, 
+          shippingType: newShippingType 
+        }));
         
         if (options.length > 0) {
           toast.success('Shipping options updated.', { id: toastId });
@@ -418,8 +704,16 @@ const CheckoutPage: React.FC = () => {
     setShippingInfo(updatedInfo);
     
     // If region is being changed, trigger shipping cost fetch
-    if (name === 'region' && value) {
-      await fetchShippingCosts(value);
+    // But skip database queries for custom regions - let useEffect handle it
+    if (name === 'region' && value && value !== 'custom') {
+      // Check if this is a custom region (not in database regions list)
+      const isCustomRegion = shippingInfo.isCustomLocation && 
+                            !regions.find(r => r.value === value);
+      
+      // Only fetch from database if it's not a custom region
+      if (!isCustomRegion) {
+        await fetchShippingCosts(value);
+      }
     }
   };
 
@@ -515,6 +809,27 @@ const CheckoutPage: React.FC = () => {
       toast.error('Failed to download receipt.', { id: toastId });
     }
   };
+
+  // Create hybrid regions list that includes custom region + database regions
+  const hybridRegions = useMemo(() => {
+    const dbRegions = regions.map(region => ({ value: region.value, label: region.label }));
+    
+    // If custom location is set, add custom region as first option
+    if (shippingInfo.isCustomLocation && shippingInfo.customRegion) {
+      return [
+        { value: 'custom', label: shippingInfo.customRegion },
+        ...dbRegions
+      ];
+    }
+    
+    return dbRegions;
+  }, [regions, shippingInfo.isCustomLocation, shippingInfo.customRegion]);
+
+  // Create hybrid counties list that includes custom county + database counties
+  const hybridCounties = useMemo(() => {
+    // Don't add custom county to the list since we're using actual county ID
+    return counties.map(county => ({ value: county.value, label: county.label }));
+  }, [counties]);
 
   if (orderComplete) {
     return (
@@ -645,6 +960,7 @@ const CheckoutPage: React.FC = () => {
                           name="phone"
                           value={shippingInfo.phone}
                           onChange={handlePhoneChange}
+                          onInput={handlePhoneInput}
                           onBlur={handlePhoneBlur}
                           className={`w-full pl-20 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-slate-400 transition-all duration-200 ${validationErrors.phone ? 'border-red-500' : ''}`}
                           placeholder="712 345 678"
@@ -666,7 +982,7 @@ const CheckoutPage: React.FC = () => {
                         County <span className="text-red-500">*</span>
                       </label>
                       <CustomDropdown
-                        options={counties}
+                        options={hybridCounties}
                         value={shippingInfo.county}
                         onChange={(value) => handleDropdownChange('county', value)}
                         isLoading={isLoadingLocations}
@@ -681,7 +997,7 @@ const CheckoutPage: React.FC = () => {
                         Region <span className="text-red-500">*</span>
                       </label>
                       <CustomDropdown
-                        options={regions}
+                        options={hybridRegions}
                         value={shippingInfo.region}
                         onChange={(value) => handleDropdownChange('region', value)}
                         isLoading={isLoadingLocations}
@@ -691,8 +1007,41 @@ const CheckoutPage: React.FC = () => {
                         required
                       />
                       {validationErrors.region && <p className="text-xs text-red-500">{validationErrors.region}</p>}
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomLocationModalOpen(true)}
+                          className="text-sm text-blue-400 hover:text-blue-300 underline transition-colors"
+                        >
+                          Can't find your location? Customize Your Own
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Delivery Notes Section */}
+                  {!selectedRegionDetails && (
+                    <div className="mt-6 pt-6 border-t border-slate-700/50">
+                      <h3 className="text-lg font-medium mb-4">Delivery Notes</h3>
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-300">
+                          Additional delivery instructions (optional)
+                        </label>
+                        <textarea
+                          name="notes"
+                          value={shippingInfo.notes || ''}
+                          onChange={(e) => setShippingInfo(prev => ({ ...prev, notes: e.target.value }))}
+                          className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 resize-none"
+                          placeholder="e.g., Leave at the gate, Call before delivery, Apartment number, etc."
+                          rows={3}
+                          maxLength={500}
+                        />
+                        <p className="text-xs text-slate-500">
+                          {shippingInfo.notes?.length || 0}/500 characters
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {shippingInfo.region && selectedRegionDetails && (
                     <div className="mt-6 pt-6 border-t border-slate-700/50">
@@ -742,6 +1091,28 @@ const CheckoutPage: React.FC = () => {
                         </div>
                       </div>
                       )}
+
+                      {/* Delivery Notes Section - Below Shipping Method */}
+                      <div className="mt-6 pt-6 border-t border-slate-700/50">
+                        <h3 className="text-lg font-medium mb-4">Delivery Notes</h3>
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-slate-300">
+                            Additional delivery instructions (optional)
+                          </label>
+                          <textarea
+                            name="notes"
+                            value={shippingInfo.notes || ''}
+                            onChange={(e) => setShippingInfo(prev => ({ ...prev, notes: e.target.value }))}
+                            className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-400 resize-none"
+                            placeholder="e.g., Leave at the gate, Call before delivery, Apartment number, etc."
+                            rows={3}
+                            maxLength={500}
+                          />
+                          <p className="text-xs text-slate-500">
+                            {shippingInfo.notes?.length || 0}/500 characters
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -796,6 +1167,15 @@ const CheckoutPage: React.FC = () => {
           </div>
         </div>
       </main>
+      {isCustomLocationModalOpen && (
+        <CustomLocationModal
+          isOpen={isCustomLocationModalOpen}
+          onClose={() => setIsCustomLocationModalOpen(false)}
+          onSave={handleCustomLocationSave}
+          initialCounty={shippingInfo.customCounty}
+          initialRegion={shippingInfo.customRegion}
+        />
+      )}
     </div>
   );
 };

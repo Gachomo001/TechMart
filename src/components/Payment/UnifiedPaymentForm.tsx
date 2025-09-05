@@ -32,6 +32,9 @@ interface UnifiedPaymentFormProps {
     region: string;
     country: string;
     shippingType: string;
+    customCounty?: string;
+    customRegion?: string;
+    isCustomLocation?: boolean;
   };
   shippingCost?: number;
 }
@@ -54,6 +57,7 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
   const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
   const [orderData, setOrderData] = useState<{
     orderNumber: string;
+    orderNumberDisplay: string;
     paymentMethod: 'card' | 'mpesa' | 'apple-pay' | 'google-pay';
     paymentDetails?: any;
   } | null>(null);
@@ -193,25 +197,28 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
           setIsLoading(false);
           
           try {
-            // Use existing server-created order id if available; avoid any awaits before redirect
-            const existingOrderId = (window as any)._tm_current_order_id as string | undefined;
-            if (!existingOrderId) {
-              console.warn('[UnifiedPayment] No existing order id found; proceeding with TEMP id for UI.');
-            }
-
-            let actualOrderNumber = existingOrderId || `TEMP-${Date.now()}`;
-            let humanReadableOrderNumber = actualOrderNumber;
+            // Use existing orderData if available, otherwise initialize with UUID
+            let actualOrderNumber = orderData?.orderNumber || (window as any)._tm_current_order_id || `TEMP-${Date.now()}`;
+            let humanReadableOrderNumber = orderData?.orderNumberDisplay || actualOrderNumber;
             
-            if (existingOrderId) {
+            // Only fetch from database if we don't already have the human-readable number
+            if ((window as any)._tm_current_order_id && (!orderData?.orderNumberDisplay || orderData.orderNumberDisplay === orderData.orderNumber)) {
               try {
+                // Add small delay to ensure database transaction is committed
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                console.log('[UnifiedPayment] Fetching order details for ID:', (window as any)._tm_current_order_id);
                 const { data: orderData, error: orderError } = await supabase
                   .from('orders')
                   .select('order_number')
-                  .eq('id', existingOrderId)
+                  .eq('id', (window as any)._tm_current_order_id)
                   .single();
+                
+                console.log('[UnifiedPayment] Database response:', { orderData, orderError });
                 
                 if (!orderError && orderData?.order_number) {
                   humanReadableOrderNumber = orderData.order_number;
+                  actualOrderNumber = (window as any)._tm_current_order_id; // Keep UUID for internal reference
                   console.log('[UnifiedPayment] Retrieved human-readable order number:', humanReadableOrderNumber);
                 } else {
                   console.warn('[UnifiedPayment] Could not fetch order_number from database:', orderError);
@@ -231,8 +238,8 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
 
             // Prepare order confirmation payload for the landing page modal
             const confirmationPayload = {
-              orderNumber: actualOrderNumber, // Keep UUID for internal reference
-              orderNumberDisplay: humanReadableOrderNumber, // Use human-readable format for display
+              orderNumber: actualOrderNumber, // UUID for internal reference
+              orderNumberDisplay: humanReadableOrderNumber, // Human-readable for display
               items,
               orderTotals: {
                 subtotal: amount - (shippingCost || 0),
@@ -473,12 +480,21 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
       const orderId = orderInit?.data?.id || orderInit?.id;
       const orderNumber = orderInit?.data?.order_number || orderInit?.order_number;
       
+      console.log('[UnifiedPayment] 🔍 ORDER CREATION DEBUG:');
+      console.log('[UnifiedPayment] Raw server response:', orderInit);
+      console.log('[UnifiedPayment] Extracted orderId (UUID):', orderId);
+      console.log('[UnifiedPayment] Extracted orderNumber (human-readable):', orderNumber);
+      
       // Update the order data with the server-generated order number
-      setOrderData({
-        orderNumber: orderNumber || `TMP-${Date.now()}`,
-        paymentMethod: 'card',
+      const newOrderData = {
+        orderNumber: orderId || `TMP-${Date.now()}`, // UUID for internal reference
+        orderNumberDisplay: orderNumber, // Human-readable for display
+        paymentMethod: 'card' as const, // Explicitly type as literal 'card'
         paymentDetails: {}
-      });
+      };
+      
+      console.log('[UnifiedPayment] 📝 Setting orderData state:', newOrderData);
+      setOrderData(newOrderData);
       
       (window as any)._tm_current_order_id = orderId;
       console.log('[UnifiedPayment] Server order initialized:', { orderId, orderNumber });
@@ -696,6 +712,7 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
         <OrderConfirmationModal
           isOpen={showOrderConfirmationModal}
           orderNumber={orderData.orderNumber}
+          orderNumberDisplay={orderData.orderNumberDisplay}
           orderItems={items}
           orderTotals={{
             subtotal: amount - (shippingCost || 0),

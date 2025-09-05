@@ -167,13 +167,16 @@ const PriceModal: React.FC<PriceModalProps> = ({ isOpen, onClose, location, onSa
 
 const DeliveryCosts: React.FC = () => {
   const [locations, setLocations] = useState<Location[]>([]);
+  const [counties, setCounties] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [countySearchQuery, setCountySearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   useEffect(() => {
     fetchLocations();
+    fetchCounties();
   }, []);
 
   const fetchLocations = async () => {
@@ -219,6 +222,43 @@ const DeliveryCosts: React.FC = () => {
     }
   };
 
+  const fetchCounties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select(`
+          id,
+          name,
+          type,
+          parent_id,
+          delivery_status,
+          delivery_costs(
+            id,
+            location_id,
+            standard_delivery_cost,
+            express_delivery_cost,
+            heavy_items_cost,
+            bulky_items_cost
+          )
+        `)
+        .eq('type', 'county')
+        .order('name');
+
+      if (error) throw error;
+      
+      // Transform the data to match our Location interface
+      const transformedData = (data as any[] || []).map(item => ({
+        ...item,
+        county: null, // Counties don't have parent counties
+        delivery_costs: Array.isArray(item.delivery_costs) ? item.delivery_costs[0] || null : item.delivery_costs || null
+      }));
+      
+      setCounties(transformedData);
+    } catch (err) {
+      console.error('Error fetching counties:', err);
+    }
+  };
+
   const handleSaveCosts = async (costs: Omit<DeliveryCosts, 'id' | 'location_id'>) => {
     if (!selectedLocation) return;
 
@@ -231,11 +271,16 @@ const DeliveryCosts: React.FC = () => {
 
     if (error) throw error;
     await fetchLocations();
+    await fetchCounties();
   };
 
   const filteredLocations = locations.filter(location =>
     location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     location.county?.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredCounties = counties.filter(county =>
+    county.name.toLowerCase().includes(countySearchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -262,6 +307,18 @@ const DeliveryCosts: React.FC = () => {
             />
           </div>
         </div>
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search counties..."
+              value={countySearchQuery}
+              onChange={(e) => setCountySearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -270,6 +327,60 @@ const DeliveryCosts: React.FC = () => {
           {error}
         </div>
       )}
+
+      {/* Counties Table */}
+      <div className="bg-slate-800 rounded-lg shadow-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50">
+          <h2 className="text-lg font-semibold text-white">Delivery Costs by County</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-slate-700/50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">County</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Standard</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Express</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Heavy Items</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Bulky Items</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {filteredCounties.map(county => {
+                const costs = county.delivery_costs;
+                console.log('[Render] County:', county.name, 'Costs:', costs);
+                return (
+                  <tr key={county.id} className="hover:bg-slate-700/30">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                      {county.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      KES {costs?.standard_delivery_cost?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      KES {costs?.express_delivery_cost?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      KES {costs?.heavy_items_cost?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                      KES {costs?.bulky_items_cost?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => setSelectedLocation(county)}
+                        className="text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        Set Prices
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Regions Table */}
       <div className="bg-slate-800 rounded-lg shadow-lg overflow-hidden">

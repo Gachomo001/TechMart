@@ -34,6 +34,9 @@ interface OrderConfirmationModalProps {
     region: string;
     country: string;
     shippingType: string;
+    customCounty?: string;
+    customRegion?: string;
+    isCustomLocation?: boolean;
   };
   paymentMethod: 'card' | 'mpesa' | 'apple-pay' | 'google-pay';
   paymentDetails?: any;
@@ -122,7 +125,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
   const handleDownloadReceipt = async () => {
     try {
       const orderData = {
-        order_number: orderNumber,
+        order_number: orderNumberDisplay || orderNumber, // Use human-readable order number for PDF
         payment_method: paymentMethod,
         payment_details: paymentDetails,
         shipping_info: {
@@ -140,7 +143,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
       };
       
       const doc = await generateReceiptPDF(orderData);
-      doc.save(`Raiyaaa_Receipt_${orderNumber}.pdf`);
+      doc.save(`Raiyaaa_Receipt_${orderNumberDisplay || orderNumber}.pdf`);
     } catch (error) {
       console.error('Error downloading receipt:', error);
       alert('Failed to download receipt. Please try again.');
@@ -397,7 +400,11 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     doc.setFontSize(14);
     doc.text(`${orderData.shipping_info.firstName} ${orderData.shipping_info.lastName}`, margin + 20, currentY);
     currentY += 20;
-    doc.text(`${orderData.shipping_info.county}, ${orderData.shipping_info.region}`, margin + 20, currentY);
+    if (orderData.shipping_info.isCustomLocation) {
+      doc.text(`${orderData.shipping_info.customCounty}, ${orderData.shipping_info.customRegion}`, margin + 20, currentY);
+    } else {
+      doc.text(`${orderData.shipping_info.county}, ${orderData.shipping_info.region}`, margin + 20, currentY);
+    }
     currentY += 20;
     doc.text(`${orderData.shipping_info.country}`, margin + 20, currentY);
     currentY += 20;
@@ -446,7 +453,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-slate-600">Order Number:</span>
-                  <p className="font-mono font-bold text-lg text-blue-600">#{orderNumberDisplay || orderNumber}</p>
+                  <p className="font-mono font-bold text-lg text-blue-600">{orderNumberDisplay || orderNumber}</p>
                 </div>
                 <div className="text-right">
                   <span className="text-slate-600">Order Date:</span>
@@ -520,7 +527,11 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
               <h4 className="font-bold mb-3 text-slate-900">Shipping Information</h4>
               <div className="text-slate-600 space-y-1">
                 <p className="font-semibold text-slate-900">{shippingInfo.firstName} {shippingInfo.lastName}</p>
-                <p>{countyName || shippingInfo.county}, {regionName || shippingInfo.region}</p>
+                {shippingInfo.isCustomLocation ? (
+                  <p>{shippingInfo.customCounty}, {shippingInfo.customRegion}</p>
+                ) : (
+                  <p>{countyName || shippingInfo.county}, {regionName || shippingInfo.region}</p>
+                )}
                 <p>{shippingInfo.country}</p>
                 {shippingInfo.email && <p className="text-blue-600">{shippingInfo.email}</p>}
                 <p>{formatPhone(shippingInfo.phone)}</p>

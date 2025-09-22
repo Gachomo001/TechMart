@@ -1,45 +1,27 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { mpesaRouter } from '../server/routes/mpesa.js';
-import { cardRouter } from '../server/routes/card.js';
-import locationsRouter from '../server/routes/locations.js';
-import footerLinksRouter from '../server/routes/footer-links.js';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
+
+// Import routes - remove .js extensions for Vercel
+import { mpesaRouter } from '../server/routes/mpesa';
+import { cardRouter } from '../server/routes/card';
+import locationsRouter from '../server/routes/locations';
+import footerLinksRouter from '../server/routes/footer-links';
 
 const app = express();
 
 // Trust proxy for Vercel
 app.set('trust proxy', 1);
 
-// CORS configuration for production
-const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow Vercel domains and localhost for development
-    const allowedOrigins = [
-      /^https:\/\/.*\.vercel\.app$/,
-      /^http:\/\/localhost:\d+$/,
-      /^https:\/\/localhost:\d+$/
-    ];
-    
-    const isAllowed = allowedOrigins.some(pattern => pattern.test(origin));
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'), false);
-    }
-  },
+// Simple CORS configuration for Vercel
+app.use(cors({
+  origin: true, // Allow all origins for now
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'Accept'],
   exposedHeaders: ['X-CSRF-Token']
-};
-
-app.use(cors(corsOptions));
+}));
 
 // Body parsing middleware
 app.use(bodyParser.json({ limit: '10mb' }));

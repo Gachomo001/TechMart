@@ -371,55 +371,6 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
     }
   };
 
-  // const createOrder = async (): Promise<Order> => {
-  //   try {
-  //       if (!user) {
-  //           throw new Error('User must be authenticated to create an order');
-  //         }
-  //     const { data, error } = await supabase
-  //       .from('orders')
-  //       .insert([
-  //         {
-  //           user_id: user.id,
-  //           total_amount: amount,
-  //           // For safety, ensure shipping_info is an object
-  //           shipping_info: shippingInfo || {},
-  //           shipping_cost: shippingCost || 0,
-  //           shipping_type: shippingInfo?.shippingType || 'standard',
-  //           status: 'pending',
-  //           // REQUIRED by schema: provide server-compatible placeholders in case this fallback runs
-  //           // NOTE: Real server-generated order is created before popup via /api/payment/card/order/init
-  //           order_number: `TMP-${Date.now()}`,
-  //           payment_method: 'card',
-  //           subtotal: amount - (shippingCost || 0),
-  //           tax_amount: (amount - (shippingCost || 0)) * 0.16,
-  //           payment_status: 'pending',
-  //         },
-  //       ])
-  //       .single();
-
-  //     if (error) {
-  //       console.error('[UnifiedPayment] Supabase insert error (orders):', {
-  //         message: error.message,
-  //         details: (error as any).details,
-  //         hint: (error as any).hint,
-  //         code: (error as any).code,
-  //       });
-  //       throw error;
-  //     }
-
-  //     console.log('[UnifiedPayment] Order created successfully:', data);
-
-  //     // Clear cart
-  //     clearCart();
-
-  //     return data;
-  //   } catch (error) {
-  //     console.error('[UnifiedPayment] Error creating order:', error);
-  //     throw error;
-  //   }
-  // };
-
   const handlePayClick = async () => {
     console.log('[UnifiedPayment] Pay button clicked');
     
@@ -447,100 +398,15 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
     setIsLoading(true);
 
     try {
-      // 1) Ensure we have a valid Supabase session for backend calls
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session?.access_token) {
-        throw new Error('Not authenticated. Please sign in again.');
-      }
-
-      // 2) Get CSRF token for the card init endpoint
-      const csrfResp = await fetch('/api/payment/card/csrf-token', { credentials: 'include' });
-      const csrfJson = await csrfResp.json().catch(() => ({}));
-      const csrfToken = csrfJson?.csrfToken;
-      if (!csrfToken) {
-        console.warn('[UnifiedPayment] No CSRF token received');
-      }
-
-      // 3) Initialize server-side order (server will generate order_number)
-      const orderInitResp = await fetch('/api/payment/card/order/init', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          amount,
-          shipping_cost: shippingCost || 0,
-          shipping_type: shippingInfo?.shippingType || 'standard',
-          shipping_info: shippingInfo || {},
-          items: items.map(i => ({ id: i.product.id, qty: i.quantity, price: i.product.price })),
-        })
-      });
-
-      if (!orderInitResp.ok) {
-        const text = await orderInitResp.text();
-        console.error('[UnifiedPayment] Order init failed:', orderInitResp.status, text);
-        throw new Error(`Order init failed: ${orderInitResp.status}`);
-      }
-      
-      const orderInit = await orderInitResp.json();
-      const orderId = orderInit?.data?.id || orderInit?.id;
-      const orderNumber = orderInit?.data?.order_number || orderInit?.order_number;
-      
-      console.log('[UnifiedPayment] 🔍 ORDER CREATION DEBUG:');
-      console.log('[UnifiedPayment] Raw server response:', orderInit);
-      console.log('[UnifiedPayment] Extracted orderId (UUID):', orderId);
-      console.log('[UnifiedPayment] Extracted orderNumber (human-readable):', orderNumber);
-      
-      // Update the order data with the server-generated order number
-      const newOrderData = {
-        orderNumber: orderId || `TMP-${Date.now()}`, // UUID for internal reference
-        orderNumberDisplay: orderNumber, // Human-readable for display
-        paymentMethod: 'card' as const, // Explicitly type as literal 'card'
-        paymentDetails: {}
-      };
-      
-      console.log('[UnifiedPayment] 📝 Setting orderData state:', newOrderData);
-      setOrderData(newOrderData);
-      
-      (window as any)._tm_current_order_id = orderId;
-      console.log('[UnifiedPayment] Server order initialized:', { orderId, orderNumber });
-
-      // 4) Create server-side payment record with api_ref
+      // Generate a simple API reference for tracking
       const apiRef = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       console.log('[UnifiedPayment] Generated API reference:', apiRef);
 
-      const paymentInitResp = await fetch('/api/payment/card', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          amount,
-          email,
-          order_details: { id: orderId, shipping_info: shippingInfo || {}, items: items.map(i => ({ id: i.product.id, qty: i.quantity, price: i.product.price })) },
-          phone_number: phone,
-          first_name: firstName,
-          last_name: lastName,
-          api_ref: apiRef,
-        })
-      });
+      // Store order ID for later use
+      const tempOrderId = `temp_${Date.now()}`;
+      (window as any)._tm_current_order_id = tempOrderId;
 
-      if (!paymentInitResp.ok) {
-        const text = await paymentInitResp.text();
-        console.error('[UnifiedPayment] Payment init failed:', paymentInitResp.status, text);
-        throw new Error(`Payment init failed: ${paymentInitResp.status}`);
-      }
-      const paymentInit = await paymentInitResp.json();
-      console.log('[UnifiedPayment] Payment record created:', paymentInit);
-
-      // 5) Open IntaSend popup
+      // Directly open IntaSend popup without backend initialization
       const paymentData = {
         amount: amount,
         currency: 'KES',

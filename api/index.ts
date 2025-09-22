@@ -36,10 +36,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ 
+  return res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    message: 'API is working'
   });
 });
 

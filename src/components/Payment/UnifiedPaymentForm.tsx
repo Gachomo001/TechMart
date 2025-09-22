@@ -413,7 +413,7 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
         email: email,
         first_name: firstName,
         last_name: lastName,
-        phone_number: phone,
+        phone_number: phone.startsWith('+') ? phone : `+254${phone.replace(/^0/, '')}`,
         api_ref: apiRef,
         redirect_url: `${window.location.origin}/checkout/complete`
       };

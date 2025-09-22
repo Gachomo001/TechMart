@@ -170,9 +170,19 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
   const initializeIntaSend = () => {
     console.log('[UnifiedPayment] Initializing IntaSend instance...');
     
+    // Temporary debug logging for production troubleshooting
+    console.log('[UnifiedPayment] Environment debug:', {
+      NODE_ENV: import.meta.env.MODE,
+      PROD: import.meta.env.PROD,
+      hasPublishableKey: !!import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY,
+      publishableKeyPrefix: import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY?.substring(0, 20) + '...',
+      allEnvKeys: Object.keys(import.meta.env).filter(key => key.includes('INTASEND'))
+    });
+    
     const publishableKey = import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY;
     if (!publishableKey) {
       console.error('[UnifiedPayment] Missing publishable key');
+      console.error('[UnifiedPayment] Available env vars:', Object.keys(import.meta.env));
       toast.error('Payment gateway is not configured. Please contact support.');
       return;
     }

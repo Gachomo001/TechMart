@@ -36,14 +36,14 @@ export const cardRouter = Router();
 
 // Initialize IntaSend with environment variables
 const publishableKey = process.env.VITE_INTASEND_PUBLISHABLE_KEY;
-const secretKey = process.env.VITE_INTASEND_SECRET_KEY;
+const secretKey = process.env.INTASEND_SECRET_KEY;
 const webhookSecret = process.env.INTASEND_WEBHOOK_SECRET;
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Validate required environment variables
 const requiredEnvVars = [
   'VITE_INTASEND_PUBLISHABLE_KEY',
-  'VITE_INTASEND_SECRET_KEY',
+  'INTASEND_SECRET_KEY',
   'INTASEND_WEBHOOK_SECRET',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY'

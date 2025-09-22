@@ -36,7 +36,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Verify required environment variables
-const requiredEnvVars = ['VITE_INTASEND_PUBLISHABLE_KEY', 'VITE_INTASEND_SECRET_KEY'];
+const requiredEnvVars = ['VITE_INTASEND_PUBLISHABLE_KEY', 'INTASEND_SECRET_KEY'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -49,7 +49,7 @@ console.log('Server starting...');
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Available environment variables:', {
   VITE_INTASEND_PUBLISHABLE_KEY: process.env.VITE_INTASEND_PUBLISHABLE_KEY ? '***SET***' : 'MISSING',
-  VITE_INTASEND_SECRET_KEY: process.env.VITE_INTASEND_SECRET_KEY ? '***SET***' : 'MISSING',
+  INTASEND_SECRET_KEY: process.env.INTASEND_SECRET_KEY ? '***SET***' : 'MISSING',
   NODE_ENV: process.env.NODE_ENV || 'development'
 });
 

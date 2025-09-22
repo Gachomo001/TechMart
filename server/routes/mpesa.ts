@@ -16,7 +16,7 @@ dotenv.config({ path: join(__dirname, '../../.env') });
 export const mpesaRouter = Router();
 
 const publishableKey = process.env.VITE_INTASEND_PUBLISHABLE_KEY || '';
-const secretKey = process.env.VITE_INTASEND_SECRET_KEY || '';
+const secretKey = process.env.INTASEND_SECRET_KEY || '';
 const isProduction = process.env.NODE_ENV === 'production';
 
 const intasend = new IntaSend(

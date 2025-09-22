@@ -55,7 +55,7 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
   const [intaSendInstance, setIntaSendInstance] = useState<any>(null);
   const [paymentTimeout, setPaymentTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
-  const [orderData, setOrderData] = useState<{
+  const [orderData] = useState<{
     orderNumber: string;
     orderNumberDisplay: string;
     paymentMethod: 'card' | 'mpesa' | 'apple-pay' | 'google-pay';

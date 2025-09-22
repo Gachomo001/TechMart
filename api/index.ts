@@ -3,11 +3,11 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 
-// Import routes - remove .js extensions for Vercel
-import { mpesaRouter } from '../server/routes/mpesa';
-import { cardRouter } from '../server/routes/card';
-import locationsRouter from '../server/routes/locations';
-import footerLinksRouter from '../server/routes/footer-links';
+// Import routes - use .js extensions for Vercel compatibility
+import { mpesaRouter } from '../server/routes/mpesa.js';
+import { cardRouter } from '../server/routes/card.js';
+import locationsRouter from '../server/routes/locations.js';
+import footerLinksRouter from '../server/routes/footer-links.js';
 
 const app = express();
 
@@ -65,4 +65,3 @@ app.use('*', (req: Request, res: Response) => {
 });
 
 export default app;
-

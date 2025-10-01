@@ -52,7 +52,7 @@ const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 const [orderData] = useState<{
   orderNumber: string;
   orderNumberDisplay: string;
-  paymentMethod: 'card' | 'mpesa' | 'mpesa_till' | 'airtel_money';
+  paymentMethod: 'card' | 'mobile_money' | 'bank_transfer' | 'ussd';
   paymentDetails?: any;
 } | null>(null);
   const {clearCart, state } = useCart();

@@ -38,18 +38,17 @@ dotenv.config({ path: join(currentDir, '../../.env') });
 export const paystackRouter = Router();
 
 // Initialize PayStack with environment variables
-const publicKey = process.env.VITE_PAYSTACK_PUBLIC_KEY;
+const publicKey = process.env.VITE_PAYSTACK_PUBLIC_KEY || process.env.PAYSTACK_PUBLIC_KEY;
 const secretKey = process.env.PAYSTACK_SECRET_KEY;
 const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET;
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'VITE_PAYSTACK_PUBLIC_KEY',
   'PAYSTACK_SECRET_KEY',
   'PAYSTACK_WEBHOOK_SECRET',
   'VITE_SUPABASE_URL',
-  'SUPABASE_SERVICE_ROLE_KEY'
+  'VITE_SUPABASE_ANON_KEY'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);

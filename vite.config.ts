@@ -19,7 +19,7 @@ export default defineConfig(({mode }) => {
     // Explicitly define environment variables for production builds
     define: {
       // Ensure environment variables are available in production
-      __VITE_PAYSTACK_PUBLIC_KEY__: JSON.stringify(env.VITE_PAYSTACK_PUBLIC_KEY),
+      __PAYSTACK_PUBLIC_KEY__: JSON.stringify(env.VITE_PAYSTACK_PUBLIC_KEY || env.PAYSTACK_PUBLIC_KEY),
       __VITE_SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL),
       __VITE_SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
     },

@@ -28,7 +28,7 @@ import { createRequire } from 'module';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 
-const requiredEnvVars = ['VITE_PAYSTACK_PUBLIC_KEY', 'PAYSTACK_SECRET_KEY'];
+const requiredEnvVars = ['PAYSTACK_SECRET_KEY'];
 const require = createRequire(import.meta.url);
 
 const app = express();
@@ -58,7 +58,7 @@ const { default: locationsRouter } = await import('./routes/locations.js');
 const { default: footerLinksRouter } = await import('./routes/footer-links.js');
 
 console.log('Available environment variables:', {
-  VITE_PAYSTACK_PUBLIC_KEY: process.env.VITE_PAYSTACK_PUBLIC_KEY ? '***SET***' : 'MISSING',
+  PAYSTACK_PUBLIC_KEY: process.env.VITE_PAYSTACK_PUBLIC_KEY || process.env.PAYSTACK_PUBLIC_KEY ? '***SET***' : 'MISSING',
   PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY ? '***SET***' : 'MISSING',
   NODE_ENV: process.env.NODE_ENV || 'development'
 });

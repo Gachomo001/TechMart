@@ -47,7 +47,7 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
   // const [paymentTimeout, setPaymentTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
   // Add this line after your other variable declarations (around line 40-50)
-const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+  const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY;
   // Update this type definition in your component or types file:
 const [orderData] = useState<{
   orderNumber: string;

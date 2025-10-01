@@ -38,7 +38,7 @@ interface OrderConfirmationModalProps {
     customRegion?: string;
     isCustomLocation?: boolean;
   };
-  paymentMethod: 'card' | 'mpesa' | 'apple-pay' | 'google-pay';
+  paymentMethod: 'card' | 'mobile_money' | 'bank_transfer' | 'ussd';
   paymentDetails?: any;
   onContinueShopping: () => void;
 }
@@ -111,12 +111,12 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     switch (paymentMethod) {
       case 'card':
         return paymentDetails?.cardLast4 ? `Card ending in ${paymentDetails.cardLast4}` : 'Credit/Debit Card';
-      case 'mpesa':
-        return paymentDetails?.phoneNumber ? `M-Pesa (${paymentDetails.phoneNumber})` : 'M-Pesa';
-      case 'apple-pay':
-        return 'Apple Pay';
-      case 'google-pay':
-        return 'Google Pay';
+      case 'mobile_money':
+        return paymentDetails?.phoneNumber ? `Mobile Money (${paymentDetails.phoneNumber})` : 'Mobile Money';
+      case 'bank_transfer':
+        return 'Bank Transfer';
+      case 'ussd':
+        return 'USSD';
       default:
         return 'Unknown';
     }
@@ -194,7 +194,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     doc.setTextColor(37, 99, 235);
     doc.setFont('helvetica', 'bold');
     const displayOrderNumber = orderNumberDisplay || orderNumber;
-    doc.text(`#${displayOrderNumber}`, margin + 20, currentY + 20);
+    doc.text(`${displayOrderNumber}`, margin + 20, currentY + 20);
     
     doc.setFontSize(14);
     doc.setTextColor(71, 85, 105);
@@ -217,9 +217,9 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
     const pmDisplay = (() => {
       const pm = orderData.payment_method;
       if (pm === 'card') return orderData.payment_details?.cardLast4 ? `Card ending in ${orderData.payment_details.cardLast4}` : 'Credit/Debit Card';
-      if (pm === 'mpesa') return orderData.payment_details?.phoneNumber ? `M-Pesa (${orderData.payment_details.phoneNumber})` : 'M-Pesa';
-      if (pm === 'apple-pay') return 'Apple Pay';
-      if (pm === 'google-pay') return 'Google Pay';
+      if (pm === 'mobile_money') return orderData.payment_details?.phoneNumber ? `Mobile Money (${orderData.payment_details.phoneNumber})` : 'Mobile Money';
+      if (pm === 'bank_transfer') return 'Bank Transfer';
+      if (pm === 'ussd') return 'USSD';
       return 'Unknown';
     })();
     doc.text(pmDisplay, margin + 20, currentY + 20);

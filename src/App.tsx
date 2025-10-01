@@ -380,6 +380,26 @@ function App() {
               </Route>
             </Routes>
           </div>
+          {showOrderConfirm && orderConfirmData && (
+            <OrderConfirmationModal
+              isOpen={showOrderConfirm}
+              orderNumber={orderConfirmData.orderNumber}
+              orderNumberDisplay={orderConfirmData.orderNumberDisplay}
+              orderItems={orderConfirmData.items}
+              orderTotals={orderConfirmData.orderTotals}
+              shippingInfo={orderConfirmData.shippingInfo}
+              paymentMethod={orderConfirmData.paymentMethod}
+              paymentDetails={orderConfirmData.paymentDetails}
+              onContinueShopping={() => {
+                setShowOrderConfirm(false);
+                setOrderConfirmData(null);
+                navigate({ pathname: '/', search: '' }, { replace: true });
+                try {
+                  localStorage.removeItem('orderConfirmation');
+                } catch {}
+              }}
+            />
+          )}
         </WishlistProvider>
       </CartProvider>
     </AuthProvider>

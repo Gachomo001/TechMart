@@ -1,13 +1,14 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 
 // Import routes - use .js extensions for Vercel compatibility
-import { mpesaRouter } from '../server/routes/mpesa.js';
-import { cardRouter } from '../server/routes/card.js';
+// import { mpesaRouter } from '../server/routes/mpesa.js';
+// import { cardRouter } from '../server/routes/card.js';
+import { paystackRouter } from '../server/routes/paystack.js';
 import locationsRouter from '../server/routes/locations.js';
 import footerLinksRouter from '../server/routes/footer-links.js';
+import bodyParser from 'body-parser';
 
 const app = express();
 
@@ -44,8 +45,9 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // Mount API routes
-app.use('/api/payment/mpesa', mpesaRouter);
-app.use('/api/payment/card', cardRouter);
+app.use('/api/payment/paystack', paystackRouter);
+// app.use('/api/payment/mpesa', mpesaRouter);
+// app.use('/api/payment/card', cardRouter);
 app.use('/api/locations', locationsRouter);
 app.use('/api/footer-links', footerLinksRouter);
 

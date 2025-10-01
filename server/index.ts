@@ -1,26 +1,35 @@
-console.log('=== SERVER STARTING ===');
-console.log('Current directory:', process.cwd());
-console.log('Environment:', process.env.NODE_ENV || 'development');
-
-import express, { Request, Response, NextFunction, json } from 'express';
-import { mpesaRouter } from './routes/mpesa.js';
-import { cardRouter } from './routes/card.js';
-import locationsRouter from './routes/locations.js';
-import footerLinksRouter from './routes/footer-links.js';
-import cors, { CorsOptions } from 'cors';
+// Load environment variables FIRST, before any other imports
 import * as dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { createRequire } from 'module';
-import bodyParser from 'body-parser';
-import cookieParser from 'cookie-parser';
 
-const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables from root .env file
 dotenv.config({ path: join(__dirname, '../.env') });
+
+// Debug: Log if env vars are loaded
+console.log('Environment variables loaded:');
+console.log('VITE_SUPABASE_URL:', !!process.env.VITE_SUPABASE_URL);
+console.log('VITE_SUPABASE_ANON_KEY:', !!process.env.VITE_SUPABASE_ANON_KEY);
+console.log('SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+console.log('=== SERVER STARTING ===');
+console.log('Current directory:', process.cwd());
+console.log('Environment:', process.env.NODE_ENV || 'development');
+
+// Now import modules that depend on environment variables
+import express, { Request, Response, NextFunction, json } from 'express';
+// import { mpesaRouter } from './routes/mpesa.js';
+// import { cardRouter } from './routes/card.js';
+import cors, { CorsOptions } from 'cors';
+import { createRequire } from 'module';
+import bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
+
+const requiredEnvVars = ['VITE_PAYSTACK_PUBLIC_KEY', 'PAYSTACK_SECRET_KEY'];
+const require = createRequire(import.meta.url);
 
 const app = express();
 const PORT = process.env.VITE_SERVER_PORT || 3001;
@@ -36,7 +45,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Verify required environment variables
-const requiredEnvVars = ['VITE_INTASEND_PUBLISHABLE_KEY', 'INTASEND_SECRET_KEY'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -44,12 +52,14 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// Debug logging
-console.log('Server starting...');
-console.log('Environment:', process.env.NODE_ENV || 'development');
+// After environment verification
+const { paystackRouter } = await import('./routes/paystack.js');
+const { default: locationsRouter } = await import('./routes/locations.js');
+const { default: footerLinksRouter } = await import('./routes/footer-links.js');
+
 console.log('Available environment variables:', {
-  VITE_INTASEND_PUBLISHABLE_KEY: process.env.VITE_INTASEND_PUBLISHABLE_KEY ? '***SET***' : 'MISSING',
-  INTASEND_SECRET_KEY: process.env.INTASEND_SECRET_KEY ? '***SET***' : 'MISSING',
+  VITE_PAYSTACK_PUBLIC_KEY: process.env.VITE_PAYSTACK_PUBLIC_KEY ? '***SET***' : 'MISSING',
+  PAYSTACK_SECRET_KEY: process.env.PAYSTACK_SECRET_KEY ? '***SET***' : 'MISSING',
   NODE_ENV: process.env.NODE_ENV || 'development'
 });
 
@@ -66,7 +76,9 @@ const allowedOrigins = isProduction
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3001',
-      'http://127.0.0.1:3001'
+      'http://127.0.0.1:3001',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
     ];
 
 // CORS options
@@ -91,14 +103,12 @@ const corsOptions: CorsOptions = {
 // Apply CORS with the above options
 app.use(cors(corsOptions));
 
-// Capture RAW body for IntaSend card webhook BEFORE any JSON parsers
-// This ensures req.rawBody is available and exact for HMAC verification
-app.use('/api/payment/card/webhook', express.raw({ type: '*/*' }), (req: any, _res, next) => {
+// Capture RAW body for PayStack webhook BEFORE any JSON parsers
+app.use('/api/payment/paystack/webhook', express.raw({ type: '*/*' }), (req: any, _res, next) => {
   try {
     if (Buffer.isBuffer(req.body)) {
       req.rawBody = req.body.toString('utf8');
-      // Also populate parsed body so downstream code can use req.body
-      try { req.body = JSON.parse(req.rawBody); } catch { /* ignore parse errors; handler may use raw */ }
+      try { req.body = JSON.parse(req.rawBody); } catch { /* ignore parse errors */ }
     }
   } catch { /* no-op */ }
   next();
@@ -126,17 +136,16 @@ app.get('/api/test', (req, res) => {
     message: 'Test endpoint is working',
     env: {
       nodeEnv: process.env.NODE_ENV || 'development',
-      hasSupabaseUrl: !!(process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
+      hasSupabaseUrl: !!(process.env.VITE_SUPABASE_URL),
       hasSupabaseKey: !!(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY),
       serverPort: process.env.VITE_SERVER_PORT || 3001
     },
     routes: [
       'GET    /api/test',
       'GET    /api/health',
-      'GET    /api/locations/health',
-      'GET    /api/locations?type=county|region',
-      'POST   /api/payment/card',
-      'POST   /api/mpesa/'
+      'GET    /api/locations',
+      'POST   /api/payment/paystack',
+      'POST   /api/payment/paystack/webhook'
     ]
   });
 });
@@ -150,16 +159,8 @@ const mountRoutes = () => {
   try {
     // Log route registration
     console.log('Mounting routes...');
-    
-    // Mount MPESA routes
-    console.log('Mounting MPESA routes at /api/payment/mpesa and /api/mpesa');
-    app.use('/api/payment/mpesa', mpesaRouter);
-    app.use('/api/mpesa', mpesaRouter);
-    
-    // Mount Card routes
-    console.log('Mounting Card routes at /api/payment/card');
-    const cardRouterPath = '/api/payment/card';
-    app.use(cardRouterPath, cardRouter);
+
+    app.use('/api/payment/paystack', paystackRouter);
     
     // Mount locations route
     console.log('Mounting Locations routes at /api/locations');
@@ -178,20 +179,21 @@ const mountRoutes = () => {
         environment: process.env.NODE_ENV || 'development',
         routes: [
           'GET    /api/health',
-          'POST   /api/payment/mpesa',
-          'POST   /api/payment/mpesa/webhook',
-          'POST   /api/payment/card',
-          'POST   /api/payment/card/webhook'
+          'POST   /api/payment/paystack',
+          'POST   /api/payment/paystack/webhook',
+          'GET    /api/payment/paystack/verify/:reference'
         ]
       });
     });
     
     console.log('\n=== Registered Routes ===');
     console.log('  GET    /api/health');
-    console.log('  POST   /api/payment/mpesa');
-    console.log('  POST   /api/payment/mpesa/webhook');
-    console.log('  POST   /api/payment/card');
-    console.log('  POST   /api/payment/card/webhook');
+    console.log('  GET    /api/test');
+    console.log('  POST   /api/payment/paystack');
+    console.log('  POST   /api/payment/paystack/webhook');
+    console.log('  GET    /api/payment/paystack/verify/:reference');
+    console.log('  GET    /api/locations');
+    console.log('  GET    /api/footer-links');
     console.log('==========================\n');
     
   } catch (error) {
@@ -203,12 +205,12 @@ const mountRoutes = () => {
 // Mount all routes
 mountRoutes();
 
-// Test card charge endpoint
-app.post('/api/test/card/charge', json(), (req, res) => {
-  console.log('Test charge endpoint hit');
+// Test PayStack endpoint
+app.post('/api/test/paystack/charge', json(), (req, res) => {
+  console.log('Test PayStack endpoint hit');
   res.json({
     success: true,
-    message: 'Test endpoint works!',
+    message: 'Test PayStack endpoint works!',
     data: {
       received: req.body,
       timestamp: new Date().toISOString()
@@ -218,31 +220,15 @@ app.post('/api/test/card/charge', json(), (req, res) => {
 
 // Log webhook URLs for easy reference
 console.log('\n=== Webhook URLs ===');
-console.log('MPESA Webhook URL:', process.env.VITE_MPESA_WEBHOOK_URL || 'Not set');
-console.log('Card Webhook URL:', process.env.VITE_CARD_WEBHOOK_URL || 'Not set');
+console.log('PayStack Webhook URL: [Your ngrok URL]/api/payment/paystack/webhook');
 console.log('==================\n');
-
-// Ensure webhook URLs are valid
-const validateWebhookUrl = (url: string | undefined, name: string) => {
-  if (!url) {
-    console.warn(`⚠️  ${name} URL is not set`);
-    return;
-  }
-  try {
-    new URL(url);
-  } catch (error) {
-    console.error(`❌ Invalid ${name} URL:`, url);
-    console.error('Please check your .env file and ensure all webhook URLs are valid');
-  }
-};
-
-// Validate webhook URLs
-validateWebhookUrl(process.env.VITE_MPESA_WEBHOOK_URL, 'MPESA Webhook');
-validateWebhookUrl(process.env.VITE_CARD_WEBHOOK_URL, 'Card Webhook');
 
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Local URL: http://localhost:${PORT}`);
-  console.log(`Public URL: ${process.env.VITE_WEBHOOK_BASE_URL}`);
+  console.log(`Health check: http://localhost:${PORT}/api/health`);
+  console.log(`Test endpoint: http://localhost:${PORT}/api/test`);
+  console.log('\n🚀 PayStack payment server is ready!');
+  console.log('💡 Start ngrok with: ngrok http 3001');
 });

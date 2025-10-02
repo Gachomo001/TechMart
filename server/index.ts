@@ -247,3 +247,5 @@ app.listen(PORT, () => {
   console.log('\n🚀 PayStack payment server is ready!');
   console.log('💡 Start ngrok with: ngrok http 3001');
 });
+
+export default app;

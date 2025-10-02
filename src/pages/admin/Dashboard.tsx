@@ -3,23 +3,15 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   Users,
   ShoppingCart,
-  Package,
   DollarSign,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  CreditCard,
-  UserPlus,
   Star,
-  Clock,
-  BarChart2,
-  Target,
-  Repeat,
-  Activity,
-  Calendar,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { FeedbackSection } from './FeedbackSection';
 
 interface OrderItem {
   product_id: string;
@@ -117,10 +109,6 @@ interface ProductSales {
   name: string;
   sales: number;
   revenue: number;
-}
-
-interface PaymentMethodRevenue {
-  [key: string]: number;
 }
 
 interface LowStockProduct {
@@ -796,6 +784,8 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+            {/* Customer Feedback */}
+            <FeedbackSection />
     </div>
   );
 };

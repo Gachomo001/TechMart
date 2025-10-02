@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Phone, Mail, Truck, User as UserIcon, Settings, LayoutDashboard, LogOut } from 'lucide-react';
+import { Phone, Mail, Truck, User as UserIcon, Settings, LayoutDashboard, LogOut, MessageSquare } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { FeedbackModal } from './FeedbackModal';
 
 export const TopBar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut, profile } = useAuth();
   const isAdminUser = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -43,90 +45,107 @@ export const TopBar = () => {
     };
   }, []);
   return (
-    <div className="bg-blue-600 text-white py-2 px-4 text-sm">
-      <div className="container mx-auto flex justify-between items-center">
-        {/* Contact info - left side */}
-        <div className="flex items-center space-x-2 text-xs sm:text-sm">
-          <div className="flex items-center">
-            <Phone size={18} className="mr-3" />
-            <span>{import.meta.env.VITE_CONTACT_PHONE || '0796 714113'}</span>
+    <>
+      <div className="bg-blue-600 text-white py-2 px-4 text-sm">
+        <div className="container mx-auto flex justify-between items-center">
+          {/* Contact info - left side */}
+          <div className="flex items-center space-x-2 text-xs sm:text-sm">
+            <div className="flex items-center">
+              <Phone size={18} className="mr-3" />
+              <span>{import.meta.env.VITE_CONTACT_PHONE || '0796 714113'}</span>
+            </div>
+            <span className="text-blue-200"></span>
+            <div className="flex items-center">
+              <Mail size={18} className="mr-3" />
+              <span>{import.meta.env.VITE_CONTACT_EMAIL || 'info@raiyaa.com'}</span>
+            </div>
           </div>
-          <span className="text-blue-200"></span>
-          <div className="flex items-center">
-            <Mail size={18} className="mr-3" />
-            <span>{import.meta.env.VITE_CONTACT_EMAIL || 'info@raiyaa.com'}</span>
-          </div>
-        </div>
 
-        {/* Icons - on right */}
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={(e) => {
-              e.preventDefault();
-              // Track Order functionality can be added here
-            }}
-            className="hover:bg-blue-700 p-1 rounded flex items-center"
-            aria-label="Track Your Order"
-          >
-            <Truck size={16} />
-            <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Track Order</span>
-          </button>
-
-          <div className="relative" ref={profileMenuRef}>
+          {/* Icons - on right */}
+          <div className="flex items-center space-x-4">
             <button 
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              onClick={() => setShowFeedbackModal(true)}
               className="hover:bg-blue-700 p-1 rounded flex items-center"
-              aria-label="My Account"
+              aria-label="Share Feedback"
             >
-              <UserIcon size={16} />
-              <span className="sr-only sm:not-sr-only sm:ml-1">Account</span>
+              <MessageSquare size={16} />
+              <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Feedback</span>
             </button>
-            {showProfileMenu && (
-              <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
-                {user ? (
-                  <>
-                    <Link
-                      to="/profile"
-                      onClick={() => setShowProfileMenu(false)}
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      <span>Edit Profile</span>
-                    </Link>
-                    {isAdminUser && (
+
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                // Track Order functionality can be added here
+              }}
+              className="hover:bg-blue-700 p-1 rounded flex items-center"
+              aria-label="Track Your Order"
+            >
+              <Truck size={16} />
+              <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Track Order</span>
+            </button>
+
+            <div className="relative" ref={profileMenuRef}>
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="hover:bg-blue-700 p-1 rounded flex items-center"
+                aria-label="My Account"
+              >
+                <UserIcon size={16} />
+                <span className="sr-only sm:not-sr-only sm:ml-1">Account</span>
+              </button>
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+                  {user ? (
+                    <>
                       <Link
-                        to="/admin"
+                        to="/profile"
                         onClick={() => setShowProfileMenu(false)}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
-                        <LayoutDashboard className="w-4 h-4 mr-2" />
-                        <span>Admin Panel</span>
+                        <Settings className="w-4 h-4 mr-2" />
+                        <span>Edit Profile</span>
                       </Link>
-                    )}
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      {isAdminUser && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setShowProfileMenu(false)}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          <span>Admin Panel</span>
+                        </Link>
+                      )}
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        <span>Sign Out</span>
+                      </button>
+                    </>
+                  ) : (
+                    <Link
+                      to="/auth"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      <span>Sign Out</span>
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    to="/auth"
-                    onClick={() => setShowProfileMenu(false)}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <div className="text-xs text-gray-500">Hello,</div>
-                    <div className="font-medium">Sign in / Register</div>
-                  </Link>
-                )}
-              </div>
-            )}
+                      <div className="text-xs text-gray-500">Hello,</div>
+                      <div className="font-medium">Sign in / Register</div>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={showFeedbackModal} 
+        onClose={() => setShowFeedbackModal(false)} 
+      />
+    </>
   );
 };
 

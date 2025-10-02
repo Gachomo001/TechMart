@@ -56,6 +56,7 @@ if (missingVars.length > 0) {
 const { paystackRouter } = await import('./routes/paystack.js');
 const { default: locationsRouter } = await import('./routes/locations.js');
 const { default: footerLinksRouter } = await import('./routes/footer-links.js');
+const { default: feedbackRouter } = await import('./routes/feedback.js');
 
 console.log('Available environment variables:', {
   PAYSTACK_PUBLIC_KEY: process.env.VITE_PAYSTACK_PUBLIC_KEY || process.env.PAYSTACK_PUBLIC_KEY ? '***SET***' : 'MISSING',
@@ -145,7 +146,10 @@ app.get('/api/test', (req, res) => {
       'GET    /api/health',
       'GET    /api/locations',
       'POST   /api/payment/paystack',
-      'POST   /api/payment/paystack/webhook'
+      'POST   /api/payment/paystack/webhook',
+      'POST   /api/feedback',
+      'GET    /api/feedback/admin',
+      'GET    /api/feedback/stats'
     ]
   });
 });
@@ -161,6 +165,10 @@ const mountRoutes = () => {
     console.log('Mounting routes...');
 
     app.use('/api/payment/paystack', paystackRouter);
+
+    // Mount feedback route
+  console.log('Mounting Feedback routes at /api/feedback');
+  app.use('/api/feedback', feedbackRouter);
     
     // Mount locations route
     console.log('Mounting Locations routes at /api/locations');
@@ -181,7 +189,10 @@ const mountRoutes = () => {
           'GET    /api/health',
           'POST   /api/payment/paystack',
           'POST   /api/payment/paystack/webhook',
-          'GET    /api/payment/paystack/verify/:reference'
+          'GET    /api/payment/paystack/verify/:reference',
+          'POST   /api/feedback',
+          'GET    /api/feedback/admin',
+          'GET    /api/feedback/stats'
         ]
       });
     });
@@ -194,6 +205,10 @@ const mountRoutes = () => {
     console.log('  GET    /api/payment/paystack/verify/:reference');
     console.log('  GET    /api/locations');
     console.log('  GET    /api/footer-links');
+    console.log('  POST   /api/feedback');
+    console.log('  GET    /api/feedback/admin');
+    console.log('  PUT    /api/feedback/admin/:id/status');
+    console.log('  GET    /api/feedback/stats');
     console.log('==========================\n');
     
   } catch (error) {

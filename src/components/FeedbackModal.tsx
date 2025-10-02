@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, MessageSquare, Send } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -39,20 +40,43 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
     setIsSubmitting(true);
     setSubmitError(null);
     setSubmitMessage(null);
-
+  
     try {
-      const response = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+      // Validate required fields
+      if (!formData.name || !formData.email || !formData.subject || !formData.message || !formData.rating) {
+        throw new Error('All fields are required');
       }
-
+  
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        throw new Error('Invalid email format');
+      }
+  
+      // Insert feedback directly into Supabase (same pattern as order creation)
+      const { data, error } = await supabase
+        .from('feedback')
+        .insert([
+          {
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            subject: formData.subject.trim(),
+            message: formData.message.trim(),
+            rating: formData.rating,
+            status: 'new',
+            created_at: new Date().toISOString()
+          }
+        ])
+        .select()
+        .single();
+  
+      if (error) {
+        console.error('Error inserting feedback:', error);
+        throw new Error('Failed to submit feedback. Please try again.');
+      }
+  
+      console.log('Feedback submitted successfully:', data);
+  
       setSubmitMessage('Thank you for your feedback! We appreciate your input.');
       setFormData({
         name: '',
@@ -67,8 +91,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
         onClose();
         setSubmitMessage(null);
       }, 2000);
-    } catch (error) {
-      setSubmitError('Failed to submit feedback. Please try again.');
+  
+    } catch (error: any) {
+      setSubmitError(error.message || 'Failed to submit feedback. Please try again.');
       console.error('Error submitting feedback:', error);
     } finally {
       setIsSubmitting(false);

@@ -67,21 +67,39 @@ export const useFooterLinks = () => {
           // Handle social media links
           const title = link.title.toLowerCase();
           if (title.includes('facebook')) {
-            socialLinks.facebook = link.url;
+            // For Facebook, if it's just a username, convert to Facebook URL
+            const url = link.url;
+            if (url && !url.startsWith('http')) {
+              socialLinks.facebook = `https://facebook.com/${url.replace(/^@/, '')}`;
+            } else {
+              socialLinks.facebook = url;
+            }
           } else if (title.includes('x') || title.includes('twitter')) {
-            socialLinks.twitter = link.url;
+            // For Twitter/X, if it's just a username, convert to X URL
+            const url = link.url;
+            if (url && !url.startsWith('http')) {
+              socialLinks.twitter = `https://x.com/${url.replace(/^@/, '')}`;
+            } else {
+              socialLinks.twitter = url;
+            }
           } else if (title.includes('instagram')) {
-            socialLinks.instagram = link.url;
-        } else if (title.includes('whatsapp')) {
+            // For Instagram, if it's just a username, convert to Instagram URL
+            const url = link.url;
+            if (url && !url.startsWith('http')) {
+              socialLinks.instagram = `https://instagram.com/${url.replace(/^@/, '')}`;
+            } else {
+              socialLinks.instagram = url;
+            }
+          } else if (title.includes('whatsapp')) {
             // For WhatsApp, if it's just a number, convert to WhatsApp URL
             const url = link.url;
             if (url && !url.startsWith('http')) {
-                // If it's just a number, create WhatsApp URL
-                socialLinks.whatsapp = `https://wa.me/${url.replace(/[^\d]/g, '')}`;
+              // If it's just a number, create WhatsApp URL
+              socialLinks.whatsapp = `https://wa.me/${url.replace(/[^\d]/g, '')}`;
             } else {
-                socialLinks.whatsapp = url;
+              socialLinks.whatsapp = url;
             }
-        }
+          }
         } else {
           // Handle regular footer links
           if (!regularLinks[link.section_name]) {

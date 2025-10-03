@@ -352,17 +352,57 @@ const FooterLinks: React.FC = () => {
               link.title.toLowerCase().includes(platform.toLowerCase().split(' ')[0])
             );
             
+            // Get the display value (username/phone number)
+            const getDisplayValue = (url: string, platform: string) => {
+              if (!url) return '';
+              
+              if (platform === 'WhatsApp') {
+                // For WhatsApp, show the phone number if it's a wa.me URL
+                if (url.includes('wa.me/')) {
+                  return url.split('wa.me/')[1];
+                }
+                return url;
+              } else {
+                // For other platforms, show username if it's a full URL
+                if (url.startsWith('http')) {
+                  const urlParts = url.split('/');
+                  return urlParts[urlParts.length - 1] || '';
+                }
+                return url;
+              }
+            };
+
+            const getPlaceholder = (platform: string) => {
+              switch (platform) {
+                case 'Facebook': return 'yourpage';
+                case 'X (Twitter)': return 'yourusername';
+                case 'Instagram': return 'yourusername';
+                case 'WhatsApp': return '+254712345678';
+                default: return 'username';
+              }
+            };
+
+            const getLabel = (platform: string) => {
+              switch (platform) {
+                case 'Facebook': return `${platform} (Page/Username)`;
+                case 'X (Twitter)': return `${platform} (Username)`;
+                case 'Instagram': return `${platform} (Username)`;
+                case 'WhatsApp': return `${platform} (Phone Number)`;
+                default: return platform;
+              }
+            };
+            
             return (
               <div key={platform} className="bg-slate-700/50 p-4 rounded border border-slate-600">
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  {platform} {platform === 'WhatsApp' ? '(Phone Number)' : '(URL)'}
+                  {getLabel(platform)}
                 </label>
                 <div className="flex">
                   <input
                     type="text"
-                    value={socialLink?.url || ''}
+                    value={getDisplayValue(socialLink?.url || '', platform)}
                     onChange={(e) => handleSocialMediaUpdate(platform, e.target.value)}
-                    placeholder={platform === 'WhatsApp' ? '+254712345678' : `https://${platform.toLowerCase()}.com/yourpage`}
+                    placeholder={getPlaceholder(platform)}
                     className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-l-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button

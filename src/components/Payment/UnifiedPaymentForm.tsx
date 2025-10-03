@@ -467,15 +467,15 @@ const [orderData] = useState<{
           <span className="text-2xl font-bold text-white">KES {amount.toLocaleString()}</span>
         </div>
       </div>
-
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="flex items-start gap-2 text-sm text-blue-800">
-          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">Secure Payment Process</p>
-            <p className="mt-1">A secure payment window will open. If blocked, please allow pop-ups for this site.</p>
-          </div>
+      <div className="mt-6 p-6 bg-blue-500/10 rounded-lg border border-blue-500/20">
+        <div className="flex items-center space-x-2 text-blue-400">
+          <Info className="w-5 h-5" />
+          <span className="text-base font-medium">Payment Information</span>
         </div>
+        <ul className="text-sm text-blue-400/80 mt-3 space-y-2 list-disc list-inside">
+          <li>A secure payment window will open in a few seconds. If blocked, please allow pop-ups for this site.</li>
+          <li>When using Mobile Money(M-Pesa & Airtel Money) ensure to input your phone number in the format '070 000 0000'. Include the spaces.</li>
+        </ul>
       </div>
 
       {/* PayStack Pay Button */}

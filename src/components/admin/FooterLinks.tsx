@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, ExternalLink, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import DeleteConfirmationModal from '../DeleteConfirmationModal';
 
 interface FooterLink {
   id: string;
@@ -30,6 +32,8 @@ const FooterLinks: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLink, setEditingLink] = useState<FooterLink | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [linkToDelete, setLinkToDelete] = useState<FooterLink | null>(null);
   const [formData, setFormData] = useState<LinkFormData>({
     section_name: '',
     title: '',
@@ -37,9 +41,7 @@ const FooterLinks: React.FC = () => {
     order_index: 0,
     opens_in_new_tab: false
   });
-  const { user, isAdmin, access_token } = useAuth();
-
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const { user, isAdmin } = useAuth();
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -51,158 +53,168 @@ const FooterLinks: React.FC = () => {
   }, [user, isAdmin]);
 
   const fetchLinks = async () => {
-    if (!access_token) {
-      setError('Authentication required');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch(`${API_BASE}/footer-links/admin`, {
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      setLoading(true);
+      setError(null);
 
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Authentication failed. Please sign in again.');
-        }
-        throw new Error('Failed to fetch footer links');
+      const { data, error: fetchError } = await supabase
+        .from('footer_links')
+        .select('*')
+        .order('section_name', { ascending: true })
+        .order('order_index', { ascending: true });
+
+      if (fetchError) {
+        console.error('Error fetching footer links:', fetchError);
+        setError('Failed to fetch footer links');
+        return;
       }
 
-      const data = await response.json();
-      setLinks(data);
-      setError(null);
+      setLinks(data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch links');
+      console.error('Error in footer links fetch:', err);
+      setError('Error fetching footer links');
     } finally {
       setLoading(false);
     }
   };
 
   const fetchSections = async () => {
-    if (!access_token) return;
-
     try {
-      const response = await fetch(`${API_BASE}/footer-links/sections`, {
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const { data, error } = await supabase
+        .from('footer_links')
+        .select('section_name')
+        .order('section_name', { ascending: true });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSections(data);
+      if (error) {
+        console.error('Error fetching sections:', error);
+        return;
       }
+
+      const uniqueSections = [...new Set(data?.map(item => item.section_name) || [])];
+      setSections(uniqueSections);
     } catch (err) {
-      console.error('Failed to fetch sections:', err);
+      console.error('Error fetching sections:', err);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!access_token) {
-      setError('Authentication required');
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
 
     try {
-      const url = editingLink 
-        ? `${API_BASE}/footer-links/${editingLink.id}`
-        : `${API_BASE}/footer-links`;
-      
-      const method = editingLink ? 'PUT' : 'POST';
+      if (editingLink) {
+        const { error } = await supabase
+          .from('footer_links')
+          .update({
+            ...formData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingLink.id);
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('footer_links')
+          .insert([{
+            ...formData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }]);
 
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Authentication failed. Please sign in again.');
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save link');
+        if (error) throw error;
       }
 
       await fetchLinks();
       await fetchSections();
       resetForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save link');
+      console.error('Error saving link:', err);
+      setError('Failed to save link');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this link?')) return;
-    if (!access_token) {
-      setError('Authentication required');
-      return;
-    }
-
+  const handleDeleteClick = (link: FooterLink) => {
+    setLinkToDelete(link);
+    setDeleteModalOpen(true);
+  };
+  
+  const handleDeleteConfirm = async () => {
+    if (!linkToDelete) return;
+  
     try {
-      const response = await fetch(`${API_BASE}/footer-links/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Authentication failed. Please sign in again.');
-        }
-        throw new Error('Failed to delete link');
-      }
-
+      setSubmitting(true);
+      const { error } = await supabase
+        .from('footer_links')
+        .delete()
+        .eq('id', linkToDelete.id);
+  
+      if (error) throw error;
       await fetchLinks();
       await fetchSections();
-      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete link');
+      console.error('Error deleting link:', err);
+      setError('Failed to delete link');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const updateOrder = async (link: FooterLink, newOrder: number) => {
-    if (!access_token) {
-      setError('Authentication required');
-      return;
-    }
+  const handleSocialMediaUpdate = (platform: string, value: string) => {
+    setLinks(prevLinks => {
+      const updatedLinks = [...prevLinks];
+      const existingIndex = updatedLinks.findIndex(link => 
+        link.section_name === 'Social Media' && 
+        link.title.toLowerCase().includes(platform.toLowerCase().split(' ')[0])
+      );
+      
+      if (existingIndex >= 0) {
+        updatedLinks[existingIndex] = { ...updatedLinks[existingIndex], url: value };
+      }
+      
+      return updatedLinks;
+    });
+  };
 
+  const saveSocialMediaLink = async (platform: string, url: string) => {
     try {
-      const response = await fetch(`${API_BASE}/footer-links/${link.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ order_index: newOrder })
-      });
+      setSubmitting(true);
+      
+      const existingLink = links.find(link => 
+        link.section_name === 'Social Media' && 
+        link.title.toLowerCase().includes(platform.toLowerCase().split(' ')[0])
+      );
 
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Authentication failed. Please sign in again.');
-        }
-        throw new Error('Failed to update link order');
+      if (existingLink) {
+        const { error } = await supabase
+          .from('footer_links')
+          .update({ url, updated_at: new Date().toISOString() })
+          .eq('id', existingLink.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('footer_links')
+          .insert([{
+            section_name: 'Social Media',
+            title: platform,
+            url,
+            order_index: ['Facebook', 'X (Twitter)', 'Instagram', 'WhatsApp'].indexOf(platform) + 1,
+            is_active: true,
+            opens_in_new_tab: true
+          }]);
+
+        if (error) throw error;
       }
 
       await fetchLinks();
-      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update order');
+      console.error('Error saving social media link:', err);
+      setError('Failed to save social media link');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -214,11 +226,11 @@ const FooterLinks: React.FC = () => {
       order_index: 0,
       opens_in_new_tab: false
     });
-    setShowAddForm(false);
     setEditingLink(null);
+    setShowAddForm(false);
   };
 
-  const startEdit = (link: FooterLink) => {
+  const handleEdit = (link: FooterLink) => {
     setFormData({
       section_name: link.section_name,
       title: link.title,
@@ -230,36 +242,74 @@ const FooterLinks: React.FC = () => {
     setShowAddForm(true);
   };
 
-  // Group links by section
-  const groupedLinks = links.reduce((acc, link) => {
-    if (!acc[link.section_name]) {
-      acc[link.section_name] = [];
+  const handleToggleActive = async (link: FooterLink) => {
+    try {
+      const { error } = await supabase
+        .from('footer_links')
+        .update({
+          is_active: !link.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', link.id);
+  
+      if (error) throw error;
+      await fetchLinks();
+    } catch (err) {
+      console.error('Error toggling link status:', err);
+      setError('Failed to update link status');
     }
-    acc[link.section_name].push(link);
-    return acc;
-  }, {} as Record<string, FooterLink[]>);
+  };
+  
+  const handleReorder = async (link: FooterLink, direction: 'up' | 'down') => {
+    const sectionLinks = links.filter(l => l.section_name === link.section_name);
+    const currentIndex = sectionLinks.findIndex(l => l.id === link.id);
+    
+    if (
+      (direction === 'up' && currentIndex === 0) ||
+      (direction === 'down' && currentIndex === sectionLinks.length - 1)
+    ) {
+      return;
+    }
+  
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const otherLink = sectionLinks[newIndex];
+  
+    try {
+      // Swap order_index values
+      const { error: error1 } = await supabase
+        .from('footer_links')
+        .update({ order_index: otherLink.order_index })
+        .eq('id', link.id);
+  
+      const { error: error2 } = await supabase
+        .from('footer_links')
+        .update({ order_index: link.order_index })
+        .eq('id', otherLink.id);
+  
+      if (error1 || error2) throw new Error('Failed to reorder links');
+      await fetchLinks();
+    } catch (err) {
+      console.error('Error reordering links:', err);
+      setError('Failed to reorder links');
+    }
+  };
 
-  // Sort links within each section by order_index
-  Object.keys(groupedLinks).forEach(section => {
-    groupedLinks[section].sort((a, b) => a.order_index - b.order_index);
-  });
+  const groupedLinks = links
+    .filter(link => link.section_name !== 'Social Media')
+    .reduce((acc, link) => {
+      if (!acc[link.section_name]) {
+        acc[link.section_name] = [];
+      }
+      acc[link.section_name].push(link);
+      return acc;
+    }, {} as Record<string, FooterLink[]>);
 
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  // Show error if not admin
-  if (!isAdmin) {
+  if (!user || !isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <h3 className="text-lg font-medium text-red-300 mb-2">Access Denied</h3>
-          <p className="text-slate-400">Admin access required to manage footer links</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600">Admin access required to manage footer links.</p>
         </div>
       </div>
     );
@@ -288,6 +338,46 @@ const FooterLinks: React.FC = () => {
           {error}
         </div>
       )}
+
+      {/* Social Media Section */}
+      <div className="mb-8 bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+          <ExternalLink className="h-5 w-5 mr-2" />
+          Social Media Links
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {['Facebook', 'X (Twitter)', 'Instagram', 'WhatsApp'].map((platform) => {
+            const socialLink = links.find(link => 
+              link.section_name === 'Social Media' && 
+              link.title.toLowerCase().includes(platform.toLowerCase().split(' ')[0])
+            );
+            
+            return (
+              <div key={platform} className="bg-slate-700/50 p-4 rounded border border-slate-600">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  {platform} {platform === 'WhatsApp' ? '(Phone Number)' : '(URL)'}
+                </label>
+                <div className="flex">
+                  <input
+                    type="text"
+                    value={socialLink?.url || ''}
+                    onChange={(e) => handleSocialMediaUpdate(platform, e.target.value)}
+                    placeholder={platform === 'WhatsApp' ? '+254712345678' : `https://${platform.toLowerCase()}.com/yourpage`}
+                    className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-l-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => saveSocialMediaLink(platform, socialLink?.url || '')}
+                    disabled={submitting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Add/Edit Form */}
       {showAddForm && (
@@ -322,7 +412,7 @@ const FooterLinks: React.FC = () => {
                   required
                 />
                 <datalist id="sections">
-                  {sections.map(section => (
+                  {sections.filter(s => s !== 'Social Media').map(section => (
                     <option key={section} value={section} />
                   ))}
                 </datalist>
@@ -426,15 +516,15 @@ const FooterLinks: React.FC = () => {
             </button>
           </div>
         ) : (
-          Object.keys(groupedLinks).map(sectionName => (
+          Object.entries(groupedLinks).map(([sectionName, sectionLinks]) => (
             <div key={sectionName} className="bg-slate-800 rounded-lg border border-slate-700">
               <div className="px-6 py-4 border-b border-slate-700">
                 <h3 className="text-lg font-semibold text-white">{sectionName}</h3>
-                <p className="text-sm text-slate-400">{groupedLinks[sectionName].length} links</p>
+                <p className="text-sm text-slate-400">{sectionLinks.length} links</p>
               </div>
               <div className="p-6">
                 <div className="space-y-3">
-                  {groupedLinks[sectionName].map((link, index) => (
+                  {sectionLinks.map((link, index) => (
                     <div
                       key={link.id}
                       className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-slate-600"
@@ -442,37 +532,54 @@ const FooterLinks: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3">
                           <span className="text-sm text-slate-400">#{link.order_index}</span>
-                          <h4 className="font-medium text-white truncate">{link.title}</h4>
+                          <h4 className={`font-medium truncate ${link.is_active ? 'text-white' : 'text-slate-500'}`}>
+                            {link.title}
+                          </h4>
                           {link.opens_in_new_tab && (
                             <ExternalLink className="w-4 h-4 text-slate-400" />
                           )}
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            link.is_active ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
+                          }`}>
+                            {link.is_active ? 'Active' : 'Inactive'}
+                          </span>
                         </div>
                         <p className="text-sm text-slate-400 truncate mt-1">{link.url}</p>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
                         <button
-                          onClick={() => updateOrder(link, Math.max(0, link.order_index - 1))}
+                          onClick={() => handleReorder(link, 'up')}
                           disabled={index === 0 || submitting}
                           className="p-1 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <ArrowUp className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => updateOrder(link, link.order_index + 1)}
-                          disabled={index === groupedLinks[sectionName].length - 1 || submitting}
+                          onClick={() => handleReorder(link, 'down')}
+                          disabled={index === sectionLinks.length - 1 || submitting}
                           className="p-1 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <ArrowDown className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => startEdit(link)}
+                          onClick={() => handleToggleActive(link)}
+                          className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                            link.is_active 
+                              ? 'bg-red-900/50 text-red-300 hover:bg-red-900/70' 
+                              : 'bg-green-900/50 text-green-300 hover:bg-green-900/70'
+                          }`}
+                        >
+                          {link.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleEdit(link)}
                           disabled={submitting}
                           className="p-2 text-slate-400 hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(link.id)}
+                          onClick={() => handleDeleteClick(link)}
                           disabled={submitting}
                           className="p-2 text-slate-400 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
@@ -487,6 +594,17 @@ const FooterLinks: React.FC = () => {
           ))
         )}
       </div>
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setLinkToDelete(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        itemName={linkToDelete?.title || ''}
+        itemType="footer link"
+      />
     </div>
   );
 };

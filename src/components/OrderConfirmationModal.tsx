@@ -38,7 +38,7 @@ interface OrderConfirmationModalProps {
     customRegion?: string;
     isCustomLocation?: boolean;
   };
-  paymentMethod: 'card' | 'mobile_money' | 'bank_transfer' | 'ussd';
+  paymentMethod: 'card' | 'mobile_money' | 'bank_transfer' | 'ussd' | 'whatsapp'; 
   paymentDetails?: any;
   onContinueShopping: () => void;
 }

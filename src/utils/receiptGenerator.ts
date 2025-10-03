@@ -1,5 +1,32 @@
 import { jsPDF } from 'jspdf';
 
+// Helper function to wrap text to fit within specified width
+const wrapText = (doc: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number = 18): number => {
+  const words = text.split(' ');
+  let line = '';
+  let currentY = y;
+  
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i] + ' ';
+    const testWidth = doc.getTextWidth(testLine);
+    
+    if (testWidth > maxWidth && i > 0) {
+      doc.text(line.trim(), x, currentY);
+      line = words[i] + ' ';
+      currentY += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  
+  if (line.trim()) {
+    doc.text(line.trim(), x, currentY);
+    currentY += lineHeight;
+  }
+  
+  return currentY;
+};
+
 interface ReceiptData {
   order_number: string;
   items: Array<{
@@ -24,9 +51,10 @@ interface ReceiptData {
   tax_amount: number;
   shipping_cost: number;
   total_amount: number;
-  payment_method: 'card' | 'mpesa';
+  payment_method: 'card' | 'mpesa' | 'whatsapp';
   payment_details: { phoneNumber?: string; cardLast4?: string } | null;
   shipping_type?: string;
+  include_payment_instructions?: boolean;
 }
 
 export const generateReceiptPDF = async (orderData: ReceiptData): Promise<jsPDF> => {
@@ -74,11 +102,11 @@ export const generateReceiptPDF = async (orderData: ReceiptData): Promise<jsPDF>
   doc.line(cardWidth + margin - cornerRadius, cardHeight + margin, cardWidth + margin, cardHeight + margin);
   doc.line(cardWidth + margin, cardHeight + margin, cardWidth + margin, cardHeight + margin - cornerRadius);
 
-  // Add TechMart title with gradient effect (simulated with blue color)
+  // Add Raiyaaa title with gradient effect (simulated with blue color)
   doc.setFontSize(38);
   doc.setTextColor(59, 130, 246);
   doc.setFont('helvetica', 'bold');
-  doc.text('TechMart', 297.64, margin + 40, { align: 'center' });
+  doc.text('Raiyaaa', 297.64, margin + 40, { align: 'center' });
   
   // Add "Order Receipt" subtitle
   doc.setFontSize(16);
@@ -86,10 +114,35 @@ export const generateReceiptPDF = async (orderData: ReceiptData): Promise<jsPDF>
   doc.setFont('helvetica', 'normal');
   doc.text('Order Receipt', 297.64, margin + 60, { align: 'center' });
 
-  // Add order details section
+  // Add order details section - declare currentY once
   let currentY = margin + 100;
-  
-  // Order details grid
+
+  // Add payment instructions for WhatsApp orders
+  if (orderData.include_payment_instructions) {
+    currentY = margin + 90;
+    
+    // Payment instructions box
+    doc.setFillColor(254, 240, 138); // yellow-200
+    doc.setDrawColor(245, 158, 11); // yellow-500
+    doc.setLineWidth(2);
+    doc.rect(margin + 20, currentY, cardWidth - 40, 60, 'FD');
+    
+    doc.setFontSize(14);
+    doc.setTextColor(146, 64, 14); // yellow-800
+    doc.setFont('helvetica', 'bold');
+    doc.text('Payment Instructions:', margin + 30, currentY + 20);
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('M-Pesa Send Money to: 0796714113', margin + 30, currentY + 35);
+    doc.text('Reference: Send Payment Message via WhatsApp to confirm payment', margin + 30, currentY + 50);
+    
+    currentY += 80;
+  } else {
+    currentY = margin + 100;
+  }
+
+  // Order details grid (continue with existing code...)
   doc.setFontSize(14);
   doc.setTextColor(71, 85, 105); // slate-600
   
@@ -98,7 +151,7 @@ export const generateReceiptPDF = async (orderData: ReceiptData): Promise<jsPDF>
   doc.setFontSize(16);
   doc.setTextColor(37, 99, 235); // blue-600
   doc.setFont('helvetica', 'bold');
-  doc.text(`#${orderData.order_number}`, margin + 20, currentY + 20);
+  doc.text(`${orderData.order_number}`, margin + 20, currentY + 20);
   
   // Right column
   doc.setFontSize(14);
@@ -177,25 +230,31 @@ export const generateReceiptPDF = async (orderData: ReceiptData): Promise<jsPDF>
       doc.setFontSize(16);
       doc.setTextColor(15, 23, 42); // slate-900
       doc.setFont('helvetica', 'bold');
-      doc.text(item.product.name, margin + 80, currentY + 20);
-      
+      // Use text wrapping for product names to prevent overflow
+      const maxProductNameWidth = cardWidth - 180; // Leave space for image and price
+      const nameEndY = wrapText(doc, item.product.name, margin + 80, currentY + 20, maxProductNameWidth, 16);
+
+      // Position quantity text after the product name ends
       doc.setFontSize(14);
       doc.setTextColor(71, 85, 105); // slate-600
       doc.setFont('helvetica', 'normal');
-      doc.text(`Qty: ${item.quantity} × KES ${item.product.price.toLocaleString()}`, margin + 80, currentY + 40);
-      
-      // Add total price
+      doc.text(`Qty: ${item.quantity} × KES ${item.product.price.toLocaleString()}`, margin + 80, nameEndY + 5); 
+
+      // Add total price - position it relative to the quantity text
+      const priceY = Math.max(currentY + 30, nameEndY + 5); // Use whichever is lower
       doc.setFontSize(18);
       doc.setTextColor(15, 23, 42); // slate-900
       doc.setFont('helvetica', 'bold');
       doc.text(
         `KES ${(item.product.price * item.quantity).toLocaleString()}`,
         cardWidth + margin - 20,
-        currentY + 30,
+        priceY,
         { align: 'right' }
       );
 
-      currentY += 80; // Add spacing between items
+      // Calculate dynamic spacing based on text height
+      const itemHeight = Math.max(80, nameEndY - currentY + 40);
+      currentY += itemHeight;
     } catch (error) {
       console.error('Error processing item image:', error);
       currentY += 80;

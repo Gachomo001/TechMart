@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { 
-  CreditCard,  Smartphone, Shield, Clock, Building2, Info, Loader, Banknote } from 'lucide-react';import { useCart } from '../../contexts/CartContext';
+  CreditCard,  Smartphone, Shield, Clock, Building2, Info, Banknote } from 'lucide-react';import { useCart } from '../../contexts/CartContext';
 import { supabase } from '../../lib/supabase';
 import OrderConfirmationModal from '../OrderConfirmationModal';
-import { CartItem } from '../../types/index';
+import { CartItem } from '../../../types';
+import { useFooterLinks } from '../../hooks/useFooterLinks';
+import { generateReceiptPDF } from '../../utils/receiptGenerator';
+
 // Define the component's props (same as before)
 interface UnifiedPaymentFormProps {
   amount: number;
@@ -49,14 +52,16 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
   // Add this line after your other variable declarations (around line 40-50)
   const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY;
   // Update this type definition in your component or types file:
-const [orderData] = useState<{
-  orderNumber: string;
-  orderNumberDisplay: string;
-  paymentMethod: 'card' | 'mobile_money' | 'bank_transfer' | 'ussd';
-  paymentDetails?: any;
-} | null>(null);
+  const [orderData, setOrderData] = useState<{
+    orderNumber: string;
+    orderNumberDisplay: string;
+    paymentMethod: 'card' | 'mobile_money' | 'bank_transfer' | 'ussd' | 'whatsapp';
+    paymentDetails?: any;
+  } | null>(null);
   const {clearCart, state } = useCart();
   const items = state.items;
+  const { socialMediaLinks, loading: footerLoading } = useFooterLinks();
+  const [isWhatsAppLoading, setIsWhatsAppLoading] = useState(false);
 
   // Load PayStack SDK
   useEffect(() => {
@@ -384,6 +389,318 @@ const [orderData] = useState<{
     }
   };
 
+  // Create order for WhatsApp payment
+  const createWhatsAppOrder = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Calculate totals
+      const subtotal = amount - (shippingCost || 0);
+      const tax_amount = subtotal * 0.16;
+
+      // Generate unique order number
+      const generateOrderNumber = () => {
+        const ts = new Date();
+        const y = ts.getFullYear();
+        const m = String(ts.getMonth() + 1).padStart(2, '0');
+        const d = String(ts.getDate()).padStart(2, '0');
+        const seq = Math.floor(Math.random() * 900000 + 100000);
+        return `Order-${y}${m}${d}-${seq}`;
+      };
+
+      const orderNumber = generateOrderNumber();
+
+      // Prepare order data for WhatsApp payment
+      const orderData = {
+        user_id: user.id,
+        status: 'pending',
+        payment_status: 'pending', // Pending until manually confirmed
+        payment_method: 'whatsapp',
+        total_amount: amount,
+        shipping_cost: shippingCost || 0,
+        tax_amount,
+        subtotal,
+        order_number: orderNumber,
+        shipping_type: shippingInfo?.shippingType || 'standard',
+        shipping_info: shippingInfo || {}, // Provide fallback empty object
+        payment_details: {
+          whatsapp_number: socialMediaLinks.whatsapp,
+          processed_at: new Date().toISOString(),
+          provider: 'whatsapp'
+        },
+        notes: 'Payment via WhatsApp - Pending confirmation'
+      };
+
+      console.log('[WhatsApp Payment] Creating order:', orderData);
+
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('[WhatsApp Payment] Order creation error:', orderError);
+        throw new Error(`Failed to create order: ${orderError.message}`);
+      }
+
+      // Create order items
+      const orderItems = items.map((item: CartItem) => ({
+        order_id: order.id,
+        product_id: item.product.id,
+        quantity: item.quantity,
+        price_at_time: item.product.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) {
+        console.error('[WhatsApp Payment] Order items creation error:', itemsError);
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw new Error(`Failed to create order items: ${itemsError.message}`);
+      }
+
+      return order;
+    } catch (error) {
+      console.error('[WhatsApp Payment] Error creating order:', error);
+      throw error;
+    }
+  };
+
+  // Handle WhatsApp payment
+  const handleWhatsAppPayment = async () => {
+    if (!socialMediaLinks.whatsapp) {
+      toast.error('WhatsApp payment is not available');
+      return;
+    }
+  
+    try {
+      setIsWhatsAppLoading(true);
+  
+      // Create the order
+      const order = await createWhatsAppOrder();
+  
+      // Fetch location names from UUIDs with better error handling
+      let countyName = shippingInfo?.county || '';
+      let regionName = shippingInfo?.region || '';
+  
+      console.log('Original location IDs:', { county: countyName, region: regionName });
+  
+      try {
+        if (shippingInfo?.county && shippingInfo.county.length > 10) { // Check if it's a UUID
+          console.log('Fetching county name for ID:', shippingInfo.county);
+          const { data: countyData, error: countyError } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', shippingInfo.county)
+            .single();
+          
+          console.log('County fetch result:', { countyData, countyError });
+          if (countyData && !countyError) {
+            countyName = countyData.name;
+          }
+        }
+  
+        if (shippingInfo?.region && shippingInfo.region.length > 10) { // Check if it's a UUID
+          console.log('Fetching region name for ID:', shippingInfo.region);
+          const { data: regionData, error: regionError } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', shippingInfo.region)
+            .single();
+          
+          console.log('Region fetch result:', { regionData, regionError });
+          if (regionData && !regionError) {
+            regionName = regionData.name;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching location names:', error);
+      }
+  
+      console.log('Final location names:', { countyName, regionName });
+  
+      // NOW generate PDF with payment instructions (after location names are resolved)
+      const receiptData = {
+        order_number: order.order_number,
+        items: items.map(item => ({
+          product: item.product,
+          quantity: item.quantity,
+          price_at_time: item.product.price
+        })),
+        shipping_info: {
+          firstName,
+          lastName,
+          county: countyName || shippingInfo?.county || '',     // Use resolved name, fallback to UUID
+          region: regionName || shippingInfo?.region || '',     // Use resolved name, fallback to UUID
+          country: shippingInfo?.country || 'Kenya',
+          email,
+          phone
+        },
+        subtotal: order.subtotal,
+        tax_amount: order.tax_amount,
+        shipping_cost: order.shipping_cost,
+        total_amount: order.total_amount,
+        payment_method: 'whatsapp' as const,
+        payment_details: null,
+        shipping_type: shippingInfo?.shippingType,
+        include_payment_instructions: true
+      };
+
+      const doc = await generateReceiptPDF(receiptData);
+      const pdfBlob = doc.output('blob');
+
+      console.log('PDF Blob created:', pdfBlob.size, 'bytes');
+
+      // Store PDF in Supabase Storage and get public URL
+      let pdfDownloadLink = '';
+      try {
+        const fileName = `order-${order.order_number}.pdf`; // Simplified path
+        console.log('Attempting to upload PDF with filename:', fileName);
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('receipts')
+          .upload(fileName, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        console.log('Upload result:', { uploadData, uploadError });
+
+        if (uploadError) {
+          console.error('Error uploading PDF:', uploadError);
+        } else {
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('receipts')
+            .getPublicUrl(fileName);
+          pdfDownloadLink = publicUrl;
+          console.log('PDF uploaded successfully:', publicUrl);
+        }
+      } catch (error) {
+        console.error('Error handling PDF upload:', error);
+      }
+
+      console.log('Original location IDs:', { county: countyName, region: regionName });
+
+      try {
+        if (shippingInfo?.county && shippingInfo.county.length > 10) { // Check if it's a UUID
+          console.log('Fetching county name for ID:', shippingInfo.county);
+          const { data: countyData, error: countyError } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', shippingInfo.county)
+            .single();
+          
+          console.log('County fetch result:', { countyData, countyError });
+          if (countyData && !countyError) {
+            countyName = countyData.name;
+          }
+        }
+
+        if (shippingInfo?.region && shippingInfo.region.length > 10) { // Check if it's a UUID
+          console.log('Fetching region name for ID:', shippingInfo.region);
+          const { data: regionData, error: regionError } = await supabase
+            .from('locations')
+            .select('name')
+            .eq('id', shippingInfo.region)
+            .single();
+          
+          console.log('Region fetch result:', { regionData, regionError });
+          if (regionData && !regionError) {
+            regionName = regionData.name;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching location names:', error);
+      }
+
+      console.log('Final location names:', { countyName, regionName });
+      console.log('PDF download link:', pdfDownloadLink);
+
+      // Create WhatsApp message with proper location names and PDF link
+      const orderSummary = items.map(item => {
+        // Truncate product name at first dash (– or -) OR pipe (|) to shorten the message
+        const shortName = item.product.name.split(/[–\-|]/)[0].trim();
+        return `• ${shortName} (Qty: ${item.quantity}) - KES ${(item.product.price * item.quantity).toLocaleString()}`;
+      }).join('\n');
+
+      const deliveryAddress = `${firstName} ${lastName}\n${countyName}${regionName ? `, ${regionName}` : ''}\n${phone}`;
+
+      // Determine if it's shop collection
+      const isShopCollection = shippingInfo?.shippingType === 'collect';
+
+      // Format delivery fee
+      const deliveryFeeText = order.shipping_cost === 0 ? 'FREE' : `KES ${order.shipping_cost.toLocaleString()}`;
+
+      const customFileName = `${order.order_number}.pdf`;
+      const whatsappMessage = encodeURIComponent(
+        `Hello! I would like to place this order:\n\n` +
+        `*ORDER*: *${order.order_number}*\n\n` +
+        `*ITEMS*:\n${orderSummary}\n\n` +
+        (!isShopCollection ? `*Delivery Fee*: ${deliveryFeeText}\n` : '') +
+        `*TOTAL*: *KES ${order.total_amount.toLocaleString()}*\n\n` +
+        (!isShopCollection ? `*DELIVERY ADDRESS*:\n${deliveryAddress}\n\n` : '') +
+        (pdfDownloadLink ? `*RECEIPT*: *${customFileName}*\n${pdfDownloadLink}\n\n` : '') +
+        `Please confirm this order and provide payment instructions. Thank you!`
+      );
+
+      console.log('Final WhatsApp message:', decodeURIComponent(whatsappMessage));
+      // Store PDF in receipts table for business reference
+      const pdfData = pdfBlob;
+      await supabase
+        .from('receipts')
+        .insert([{
+          order_id: order.id,
+          pdf_data: pdfData,
+          created_at: new Date().toISOString()
+        }]);
+
+      // Clear cart
+      clearCart();
+
+      // Set order data for confirmation modal
+      setOrderData({
+        orderNumber: order.order_number,
+        orderNumberDisplay: order.order_number,
+        paymentMethod: 'whatsapp' as any,
+        paymentDetails: { whatsappNumber: socialMediaLinks.whatsapp }
+      });
+
+      // Open WhatsApp
+      const whatsappUrl = `${socialMediaLinks.whatsapp}?text=${whatsappMessage}`;
+      window.open(whatsappUrl, '_blank');
+
+      // Show success and redirect
+      toast.success('Order created! Redirecting to WhatsApp...');
+      
+      // Show order confirmation modal
+      setShowOrderConfirmationModal(true);
+
+      // Call onPaymentComplete if provided
+      if (onPaymentComplete) {
+        onPaymentComplete({
+          reference: order.order_number,
+          status: 'success',
+          trans: order.order_number,
+          transaction: order.order_number,
+          trxref: order.order_number,
+          redirecturl: ''
+        });
+      }
+
+    } catch (error) {
+      console.error('[WhatsApp Payment] Error:', error);
+      toast.error('Failed to create WhatsApp order. Please try again.');
+    } finally {
+      setIsWhatsAppLoading(false);
+    }
+  };
+
   const paymentMethods = [
     {
       id: 'mpesa',
@@ -478,45 +795,56 @@ const [orderData] = useState<{
         </ul>
       </div>
 
-      {/* PayStack Pay Button */}
-      {/* <button
-        type="button"
-        onClick={handlePayClick}
-        className={`w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:scale-[1.02] ${
-          disabled || isLoading || !isSdkReady ? 'opacity-50 cursor-not-allowed transform-none' : ''
-        }`}
-        disabled={disabled || isLoading || !isSdkReady}
-      >
-        {isLoading ? (
-          <div className="flex items-center justify-center space-x-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            <span>Opening Payment Options...</span>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center space-x-3">
-            <CreditCard className="w-5 h-5" />
-            <span>Choose Payment Method - KES {amount.toLocaleString()}</span>
-          </div>
-        )}
-      </button> */}
+      {/* Payment Buttons */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* PayStack Button */}
+        <button
+          type="button"
+          onClick={handlePayClick}
+          className={`flex-1 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:scale-[1.02] ${
+            disabled || isLoading || !isSdkReady ? 'opacity-50 cursor-not-allowed transform-none' : ''
+          }`}
+          disabled={disabled || isLoading || !isSdkReady}
+        >
+          {isLoading ? (
+            <div className="flex items-center justify-center space-x-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span>Opening Payment Options...</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center space-x-3">
+              <CreditCard className="w-5 h-5" />
+              <span>Pay Securely with PayStack - KES {amount.toLocaleString()}</span>
+            </div>
+          )}
+        </button>
 
-      <button
-        onClick={handlePayClick}
-        disabled={disabled || isLoading}
-        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-      >
-        {isLoading ? (
-          <>
-            <Loader className="w-4 h-4 animate-spin" />
-            Opening Secure Payment...
-          </>
-        ) : (
-          <>
-            <Shield className="w-4 h-4" />
-            Pay Securely with PayStack
-          </>
-        )}
-      </button>
+        {/* WhatsApp Button */}
+        <button
+          type="button"
+          onClick={handleWhatsAppPayment}
+          className={`flex-1 px-6 py-4 font-semibold rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all transform ${
+            !socialMediaLinks.whatsapp || footerLoading || isWhatsAppLoading
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-50 transform-none'
+              : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white hover:scale-[1.02] focus:ring-green-500'
+          }`}
+          disabled={!socialMediaLinks.whatsapp || footerLoading || isWhatsAppLoading}
+        >
+          {isWhatsAppLoading ? (
+            <div className="flex items-center justify-center space-x-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span>Creating Order...</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center space-x-3">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.785"/>
+              </svg>
+              <span>Pay via WhatsApp - KES {amount.toLocaleString()}</span>
+            </div>
+          )}
+        </button>
+      </div>
 
       {/* Payment Security Info */}
       <div className="text-center space-y-2">

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useFooterLinks } from '../hooks/useFooterLinks';
 
 const WhatsAppButton: React.FC = () => {
-  const whatsappNumber = import.meta.env.VITE_WHATSAPP_NUMBER;
+  const { socialMediaLinks, loading } = useFooterLinks();
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -21,11 +22,12 @@ const WhatsAppButton: React.FC = () => {
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
 
-  if (!whatsappNumber) {
+  // Don't show the button if loading or no WhatsApp number is configured
+  if (loading || !socialMediaLinks.whatsapp) {
     return null;
   }
 
-  const whatsappUrl = `https://wa.me/${whatsappNumber}`;
+  const whatsappUrl = socialMediaLinks.whatsapp;
   const showTooltip = !isMobile && isHovered;
 
   return (

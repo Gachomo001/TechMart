@@ -54,11 +54,11 @@ export const TopBar = () => {
               <Phone size={18} className="mr-3" />
               <span>{import.meta.env.VITE_CONTACT_PHONE || '0796 714113'}</span>
             </div>
-            <span className="text-blue-200"></span>
+            {/* <span className="text-blue-200"></span>
             <div className="flex items-center">
               <Mail size={18} className="mr-3" />
               <span>{import.meta.env.VITE_CONTACT_EMAIL || 'info@raiyaa.com'}</span>
-            </div>
+            </div> */}
           </div>
 
           {/* Icons - on right */}

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Check, Download } from 'lucide-react';
-import { CartItem } from '../../types';
+import { CartItem } from '../types/index';
 import jsPDF from 'jspdf';
 import { UserOptions } from 'jspdf-autotable';
 
@@ -478,7 +478,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
                     <div key={item.product.id} className="flex items-start py-3 border-b border-slate-100 last:border-b-0">
                       <div className="flex items-start space-x-4 w-full">
                         <img 
-                          src={item.product.image || item.product.image_url} 
+                          src={item.product.image || item.product.image_url || ''} 
                           alt={item.product.name}
                           className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl"
                         />

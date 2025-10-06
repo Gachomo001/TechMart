@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Product } from '../types';
+import { Product } from '../types/index';
 import PromotionBar from './PromotionBar';
 
 interface ProductImage {

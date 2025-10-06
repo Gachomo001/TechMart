@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import ProductCard from './ProductCard';
-import { Product } from '../types';
+import { Product } from '../types/index';
 import { supabase } from '../lib/supabase';
 import ProductModal from './ProductModal';
 

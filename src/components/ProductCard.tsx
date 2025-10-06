@@ -1,6 +1,6 @@
 import React from 'react';
 import { Star, ShoppingCart, Heart, Eye } from 'lucide-react';
-import { Product } from '../types';
+import { Product } from '../types/index';
 import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 

@@ -34,11 +34,12 @@ const WhatsAppInquiryButton: React.FC<WhatsAppInquiryButtonProps> = ({
     
     // Create WhatsApp message following the specified format
     const whatsappMessage = encodeURIComponent(
-        `Hi Raiyaaa,\n` +
-        `I need more information on this product:\n\n` +
-        `${product.name}\n\n` +
-        `${productUrl}`
-    );
+      `Hi Raiyaaa,\n` +
+      `I need more information on this product:\n\n` +
+      `${product.name}\n\n` +
+      `Price: KES ${product.price.toLocaleString()}\n\n` +
+      `${productUrl}`
+  );
   
     // Open WhatsApp with the message
     const whatsappUrl = `${socialMediaLinks.whatsapp}?text=${whatsappMessage}`;

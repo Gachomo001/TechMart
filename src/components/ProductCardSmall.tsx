@@ -1,7 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Product } from '../types';
+import { Product } from '../types/index';
 
 interface ProductCardSmallProps {
   product: Product;
@@ -19,7 +19,7 @@ const ProductCardSmall: React.FC<ProductCardSmallProps> = ({
   return (
     <Link 
       to={`/product/${product.slug}`}
-      className="block group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 h-full flex flex-col"
+      className=" group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 h-full flex flex-col"
     >
       <div className="relative pt-[100%] bg-gray-50">
         {product.image_url && (

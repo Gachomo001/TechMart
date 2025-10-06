@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Upload, Trash2 } from 'lucide-react';
-import { Product } from '../../types';
+import { Product } from '../../types/index';
 
 interface Category {
   id: string;

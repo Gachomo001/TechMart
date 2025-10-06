@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Filter } from 'lucide-react';
 import ProductCard from './ProductCard';
 import ProductModal from './ProductModal';
-import { Product } from '../types';
+import { Product } from '../types/index';
 import { supabase } from '../lib/supabase';
 
 interface Category {

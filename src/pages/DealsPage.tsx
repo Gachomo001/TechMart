@@ -5,7 +5,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Cart from '../components/Cart';
 import Wishlist from '../components/Wishlist';
-import { Product } from '../types';
+import { Product } from '../types/index';
 import { supabase } from '../lib/supabase';
 
 interface DealsPageProps {

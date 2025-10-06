@@ -4,7 +4,7 @@ import {
   CreditCard,  Smartphone, Shield, Clock, Building2, Info, Banknote } from 'lucide-react';import { useCart } from '../../contexts/CartContext';
 import { supabase } from '../../lib/supabase';
 import OrderConfirmationModal from '../OrderConfirmationModal';
-import { CartItem } from '../../../types';
+import { CartItem } from '../../types/index';
 import { useFooterLinks } from '../../hooks/useFooterLinks';
 import { generateReceiptPDF } from '../../utils/receiptGenerator';
 
@@ -46,7 +46,6 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSdkReady, setIsSdkReady] = useState(false);
-  const [paystackInstance, setPaystackInstance] = useState<any>(null);
   // const [paymentTimeout, setPaymentTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showOrderConfirmationModal, setShowOrderConfirmationModal] = useState(false);
   // Add this line after your other variable declarations (around line 40-50)
@@ -112,7 +111,6 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
     }
   
     // PaystackPop is not a constructor - use it directly
-    setPaystackInstance(window.PaystackPop);
     setIsSdkReady(true);
     console.log('[UnifiedPayment] PayStack instance initialized successfully');
   };
@@ -528,7 +526,11 @@ const UnifiedPaymentForm: React.FC<UnifiedPaymentFormProps> = ({
       const receiptData = {
         order_number: order.order_number,
         items: items.map(item => ({
-          product: item.product,
+          product: {
+            name: item.product.name,
+            price: item.product.price,
+            image_url: item.product.image_url || '/placeholder-image.jpg'  // Handle null case
+          },
           quantity: item.quantity,
           price_at_time: item.product.price
         })),

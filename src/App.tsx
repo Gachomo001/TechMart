@@ -29,7 +29,7 @@ import DeliveryCosts from './pages/admin/DeliveryCosts';
 import FooterLinks from './components/admin/FooterLinks';
 import CategoryPage from './pages/CategoryPage';
 import ProfilePage from './pages/ProfilePage';
-import { Product } from './types';
+import { Product } from './types/index';
 import { supabase } from './lib/supabase';
 import WhatsAppButton from './components/WhatsAppButton';
 import HotDeals from './components/HotDeals';

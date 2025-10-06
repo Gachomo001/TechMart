@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
-import { Product } from '../types';
+import { Product } from '../types/index';
 
 interface WishlistState {
   items: Product[];

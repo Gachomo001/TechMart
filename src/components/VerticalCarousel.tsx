@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronUp, ChevronDown, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Product } from '../types';
+import { Product } from '../types/index';
 
 interface VerticalCarouselProps {
   products: Product[];

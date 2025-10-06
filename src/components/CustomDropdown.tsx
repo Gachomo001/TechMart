@@ -60,7 +60,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   );
 
   return (
-    <div ref={dropdownRef} className="relative w-full z-30">
+    <div ref={dropdownRef} className={`relative w-full ${isOpen ? 'z-[100]' : 'z-30'}`}>
       {tooltipText && (disabled || isLoading) ? (
         <div className="relative group">
           {dropdownTrigger}
@@ -73,7 +73,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
       )}
 
       {isOpen && !isLoading && (
-        <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-[110] mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           <ul className="py-1">
             {options.map(option => (
               <li

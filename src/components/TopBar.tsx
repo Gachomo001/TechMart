@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { Phone, Mail, Truck, User as UserIcon, Settings, LayoutDashboard, LogOut, MessageSquare } from 'lucide-react';
+import { Phone, Truck, User as UserIcon, Settings, LayoutDashboard, LogOut, MessageSquare } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FeedbackModal } from './FeedbackModal';
-
+import TrackOrderModal from './TrackOrderModal';
 export const TopBar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showTrackOrderModal, setShowTrackOrderModal] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const { user, signOut, profile } = useAuth();
   const isAdminUser = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -21,6 +22,10 @@ export const TopBar = () => {
       console.error('Error signing out:', error);
     }
   };
+  
+  const handleTrackOrder = () => {
+    setShowTrackOrderModal(true);
+  };
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -29,6 +34,7 @@ export const TopBar = () => {
         setShowProfileMenu(false);
       }
     };
+    setShowTrackOrderModal(false);
 
     const handleEscapeKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -72,17 +78,17 @@ export const TopBar = () => {
               <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Feedback</span>
             </button>
 
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                // Track Order functionality can be added here
-              }}
-              className="hover:bg-blue-700 p-1 rounded flex items-center"
-              aria-label="Track Your Order"
-            >
-              <Truck size={16} />
-              <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Track Order</span>
-            </button>
+            {/* Only show Track Order button when user is logged in */}
+            {user && (
+              <button 
+                onClick={handleTrackOrder}
+                className="hover:bg-blue-700 p-1 rounded flex items-center"
+                aria-label="Track Your Order"
+              >
+                <Truck size={16} />
+                <span className="sr-only sm:not-sr-only sm:ml-1 sm:inline">Track Order</span>
+              </button>
+            )}
 
             <div className="relative" ref={profileMenuRef}>
               <button 
@@ -139,6 +145,12 @@ export const TopBar = () => {
           </div>
         </div>
       </div>
+
+      {/* Track Order Modal */}
+      <TrackOrderModal 
+        isOpen={showTrackOrderModal} 
+        onClose={() => setShowTrackOrderModal(false)} 
+      />
 
       {/* Feedback Modal */}
       <FeedbackModal 

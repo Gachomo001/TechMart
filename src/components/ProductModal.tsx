@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, ShoppingCart, Heart, Truck, Shield, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Star, ShoppingCart, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Product } from '../types';
+import { Product } from '../types/index';
 import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Review } from '../types/index';
+import WhatsAppInquiryButton from './WhatsAppInquiryButton';
+
 
 interface ProductModalProps {
   product: Product | null;
@@ -390,6 +392,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, isOpen, onClose })
                 <span className={`font-medium ${product.stock_quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {product.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
                 </span>
+              </div>
+              <div className="mt-4">
+                {/* WhatsApp Inquiry Button */}
+                <WhatsAppInquiryButton product={product} />
               </div>
 
               {/* Action Buttons */}

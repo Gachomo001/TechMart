@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { UserOptions } from 'jspdf-autotable';
-import { CartItem } from '../../types';
+import { CartItem } from '../types/index';
 import { Check, Download } from 'lucide-react';
 import BackButton from '@/components/BackButton';
 import CustomDropdown from '@/components/CustomDropdown';

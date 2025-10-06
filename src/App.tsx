@@ -35,6 +35,7 @@ import WhatsAppButton from './components/WhatsAppButton';
 import HotDeals from './components/HotDeals';
 import OrderConfirmationModal from './components/OrderConfirmationModal';
 import AuthCallback from './components/AuthCallback';
+import ProductModalHandler from './components/ProductModalHandler';
 
 function App() {
   const location = useLocation();
@@ -341,6 +342,7 @@ function App() {
                       </div>
                     </div>
                   )}
+                  <ProductModalHandler />
                 </>
               } />
               <Route

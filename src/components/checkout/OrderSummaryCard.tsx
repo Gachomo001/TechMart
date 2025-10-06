@@ -1,5 +1,5 @@
 import React from 'react';
-import { CartItem, Product as BaseProduct } from '../../../types';
+import { CartItem, Product as BaseProduct } from '../../types/index';
 
 // Extend the base Product type to include product_images
 type Product = BaseProduct & {

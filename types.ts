@@ -5,7 +5,7 @@ export interface Category {
 }
 
 export interface Product {
-  image_url: string;
+  image_url: string | null;
   id: string;
   name: string;
   price: number;

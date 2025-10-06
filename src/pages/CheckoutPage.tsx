@@ -390,6 +390,34 @@ const CheckoutPage: React.FC = () => {
         // Check if component is still active before updating state
         if (!isActive) return;
 
+        // If region delivery costs not found, try county delivery costs from database
+        if (deliveryCostsError && shippingInfo.county) {
+          console.log('Region delivery costs not found, trying county delivery costs...');
+          
+          const { data: countyData, error: countyError } = await supabase
+            .from('delivery_costs')
+            .select('standard_delivery_cost, express_delivery_cost, heavy_items_cost, bulky_items_cost')
+            .eq('location_id', shippingInfo.county)
+            .single();
+
+          if (!countyError && countyData) {
+            const costs = countyData;
+            const options = [
+              { id: 'collect', name: 'Collect at the Shop', description: 'Pick up your order from our store - FREE', price: 0, icon: '🏪' },
+              { id: 'standard', name: 'Standard Delivery', description: 'For items under 5kg (electronics, small accessories)', price: costs.standard_delivery_cost, icon: '🚚' },
+              { id: 'express', name: 'Express Delivery', description: 'For items 5-15kg (medium electronics, small appliances)', price: costs.express_delivery_cost, icon: '⚡' },
+              { id: 'heavy', name: 'Heavy Items', description: 'For items 15-30kg (large appliances, Standard PC Builds)', price: costs.heavy_items_cost, icon: '🏋️' },
+              { id: 'bulky', name: 'Bulky Items', description: 'For items over 30kg (large PC Builds, multiple items)', price: costs.bulky_items_cost, icon: '📦' },
+            ].filter(option => option.price > 0 || option.id === 'collect');
+            
+            setShippingOptions(options);
+            setShippingInfo(prev => ({ ...prev, shippingType: options.length > 0 ? options[0].id : '' }));
+            setSelectedRegionDetails({ delivery_status: 'paid', delivery_costs: costs });
+            toast.success('Using county delivery rates for this region.', { id: toastId });
+            return;
+          }
+        }
+
         // If region delivery costs not found, try to use county delivery costs
         if (deliveryCostsError && shippingInfo.customCountyDeliveryCosts) {
           const costs = shippingInfo.customCountyDeliveryCosts;
@@ -530,7 +558,7 @@ const CheckoutPage: React.FC = () => {
     return () => {
       isActive = false;
     };
-  }, [shippingInfo.region, shippingInfo.customCountyDeliveryCosts]);
+  }, [shippingInfo.region, shippingInfo.customCountyDeliveryCosts, shippingInfo.county]);
 
   const formatPhoneNumber = (value: string): string => {
     const numbers = value.replace(/[^0-9]/g, '');

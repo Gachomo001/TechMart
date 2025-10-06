@@ -151,7 +151,7 @@ const CheckoutPage: React.FC = () => {
       try {
         const { data, error } = await supabase.from('locations').select('id, name').eq('type', 'county');
         if (error) throw error;
-        setCounties(data.map(loc => ({ value: loc.id, label: loc.name })));
+        setCounties(data.map(loc => ({ value: loc.id, label: loc.name })).sort((a, b) => a.label.localeCompare(b.label)));
       } catch (error) {
         console.error('Error fetching counties:', error);
         toast.error('Could not load counties.');
@@ -179,7 +179,7 @@ const CheckoutPage: React.FC = () => {
             data.map((region) => ({
               value: region.id,
               label: region.name,
-            }))
+            })).sort((a, b) => a.label.localeCompare(b.label))
           );
         } catch (error) {
           console.error('Error fetching regions:', error);
@@ -840,7 +840,7 @@ const CheckoutPage: React.FC = () => {
 
   // Create hybrid regions list that includes custom region + database regions
   const hybridRegions = useMemo(() => {
-    const dbRegions = regions.map(region => ({ value: region.value, label: region.label }));
+    const dbRegions = regions.map(region => ({ value: region.value, label: region.label })).sort((a, b) => a.label.localeCompare(b.label));
     
     // If custom location is set, add custom region as first option
     if (shippingInfo.isCustomLocation && shippingInfo.customRegion) {
@@ -856,7 +856,7 @@ const CheckoutPage: React.FC = () => {
   // Create hybrid counties list that includes custom county + database counties
   const hybridCounties = useMemo(() => {
     // Don't add custom county to the list since we're using actual county ID
-    return counties.map(county => ({ value: county.value, label: county.label }));
+    return counties.map(county => ({ value: county.value, label: county.label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [counties]);
 
   if (orderComplete) {
